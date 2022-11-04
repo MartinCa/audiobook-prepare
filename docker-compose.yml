@@ -1,0 +1,16 @@
+services:
+  audiobook-prepare:
+    image: martinc01/audiobook-prepare
+    container_name: audiobook-prepare
+    volumes:
+      - /mnt/user/data/process/audiobooks/mp3merge:/input
+      - /mnt/user/data/process/audiobooks/untagged:/output
+      - /mnt/user/data/process/audiobooks/failed/:/failed
+      - /mnt/user/data/process/audiobooks/ebookfiles:/ebookfiles
+      - /mnt/cache/appdata/audiobook-prepare/:/config
+    environment:
+      - PUID=99
+      - PGID=100
+      - CPU_CORES=4
+      - MONITOR_DIR=0
+      - SLEEPTIME=5m
