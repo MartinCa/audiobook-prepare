@@ -26,6 +26,12 @@ else
 	CPUcores="$CPU_CORES"
 fi
 
+if [ $MONITOR_DIR != 1 ]; then
+	echo "Only doing single run"
+else
+	echo "Continously running monitoring directory"
+fi
+
 # Run interval
 if [ -z "$SLEEPTIME" ]; then
 	echo "Using standard 5 min sleep time."
@@ -209,7 +215,7 @@ while [ $keep_running == 1 ]; do
 				echo "  Processing succeeded"
 				if [ -d "$full_source_path" ]; then
 					rm "$full_source_path" -r
-				else
+				elif [ -f "$full_source_path" ]; then
 					rm "$full_source_path"
 				fi
 				echo "$(date -I'seconds') SUCCESS $action $dir_item" >>"$logfile"
