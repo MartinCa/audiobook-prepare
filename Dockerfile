@@ -1,5 +1,5 @@
 FROM sandreas/tone:v0.1.3 as tone
-FROM alpine:3.17.2 as builder
+FROM alpine:3.16.4 as builder
 
 ARG MP4V2_URL="https://github.com/enzo1982/mp4v2/archive/refs/tags/v2.1.2.zip"
 
@@ -380,7 +380,7 @@ RUN echo "---- output versions ----" && \
 #     && apk del --purge build-dependencies && rm -rf /tmp/*
 
 ## Actual image
-FROM alpine:3.17.2
+FROM alpine:3.16.4
 
 RUN echo "---- INSTALL RUNTIME PACKAGES ----" && \
     apk add --no-cache --update --upgrade \
