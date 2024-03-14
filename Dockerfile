@@ -1,5 +1,5 @@
-FROM sandreas/tone:v0.1.0 as tone
-FROM alpine:3.16.2 as builder
+FROM sandreas/tone:v0.1.5 as tone
+FROM alpine:3.19.1 as builder
 
 ARG MP4V2_URL="https://github.com/enzo1982/mp4v2/archive/refs/tags/v2.1.1.zip"
 
