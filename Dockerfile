@@ -1,11 +1,10 @@
 FROM sandreas/tone:v0.1.5 as tone
 FROM alpine:3.16.9 as builder
 
-ARG MP4V2_URL="https://github.com/enzo1982/mp4v2/archive/refs/tags/v2.1.1.zip"
+ARG MP4V2_URL="https://github.com/enzo1982/mp4v2/archive/refs/tags/v2.1.3.zip"
 
-ARG FDK_AAC_VERSION=2.0.2
+ARG FDK_AAC_VERSION=2.0.3
 ARG FDK_AAC_URL="https://github.com/mstorsjo/fdk-aac/archive/v$FDK_AAC_VERSION.tar.gz"
-ARG FDK_AAC_SHA256="7812b4f0cf66acda0d0fe4302545339517e702af7674dd04e5fe22a5ade16a90"
 
 # Reference: https://github.com/sandreas/dockerhub-builds
 
@@ -39,9 +38,9 @@ RUN echo "---- PREPARE FDKAAC-DEPENDENCIES ----" \
 
 RUN echo "---- COMPILE FDKAAC ENCODER (executable binary for usage of --audio-profile) ----" \
     && cd /tmp/ \
-    && wget https://github.com/nu774/fdkaac/archive/1.0.0.tar.gz \
-    && tar xzf 1.0.0.tar.gz \
-    && cd fdkaac-1.0.0 \
+    && wget https://github.com/nu774/fdkaac/archive/v1.0.5.tar.gz \
+    && tar xzf v1.0.5.tar.gz \
+    && cd fdkaac-1.0.5 \
     && autoreconf -i && ./configure --enable-static --disable-shared && make -j$(nproc) && make install && rm -rf /tmp/*
 
 ## START FFMPEG BUILD
@@ -122,9 +121,9 @@ RUN echo "---- MP3LAME ----" && \
 # bump: opencoreamr /OPENCOREAMR_VERSION=([\d.]+)/ fetch:https://sourceforge.net/projects/opencore-amr/files/opencore-amr/|/opencore-amr-([\d.]+).tar.gz/
 # bump: opencoreamr after ./hashupdate Dockerfile OPENCOREAMR $LATEST
 # bump: opencoreamr link "ChangeLog" https://sourceforge.net/p/opencore-amr/code/ci/master/tree/ChangeLog
-ARG OPENCOREAMR_VERSION=0.1.5
+ARG OPENCOREAMR_VERSION=0.1.6
 ARG OPENCOREAMR_URL="https://sourceforge.net/projects/opencore-amr/files/opencore-amr/opencore-amr-$OPENCOREAMR_VERSION.tar.gz"
-ARG OPENCOREAMR_SHA256=2c006cb9d5f651bfb5e60156dbff6af3c9d35c7bbcc9015308c0aff1e14cd341
+ARG OPENCOREAMR_SHA256=483eb4061088e2b34b358e47540b5d495a96cd468e361050fae615b1809dc4a1
 RUN echo "---- opencore ----" && \
     wget $WGET_OPTS -O opencoreamr.tar.gz "$OPENCOREAMR_URL" && \
     echo "$OPENCOREAMR_SHA256  opencoreamr.tar.gz" | sha256sum --status -c - && \
@@ -135,9 +134,9 @@ RUN echo "---- opencore ----" && \
 # bump: openjpeg /OPENJPEG_VERSION=([\d.]+)/ https://github.com/uclouvain/openjpeg.git|*
 # bump: openjpeg after ./hashupdate Dockerfile OPENJPEG $LATEST
 # bump: openjpeg link "CHANGELOG" https://github.com/uclouvain/openjpeg/blob/master/CHANGELOG.md
-ARG OPENJPEG_VERSION=2.5.0
+ARG OPENJPEG_VERSION=2.5.2
 ARG OPENJPEG_URL="https://github.com/uclouvain/openjpeg/archive/v$OPENJPEG_VERSION.tar.gz"
-ARG OPENJPEG_SHA256=0333806d6adecc6f7a91243b2b839ff4d2053823634d4f6ed7a59bc87409122a
+ARG OPENJPEG_SHA256=90e3896fed910c376aaf79cdd98bdfdaf98c6472efd8e1debf0a854938cbda6a
 RUN echo "---- openjpeg ----" && \
     wget $WGET_OPTS -O openjpeg.tar.gz "$OPENJPEG_URL" && \
     echo "$OPENJPEG_SHA256  openjpeg.tar.gz" | sha256sum --status -c - && \
@@ -276,9 +275,9 @@ RUN echo "---- vorbis ----" && \
 # bump: libwebp after ./hashupdate Dockerfile LIBWEBP $LATEST
 # bump: libwebp link "Release notes" https://github.com/webmproject/libwebp/releases/tag/v$LATEST
 # bump: libwebp link "Source diff $CURRENT..$LATEST" https://github.com/webmproject/libwebp/compare/v$CURRENT..v$LATEST
-ARG LIBWEBP_VERSION=1.2.2
+ARG LIBWEBP_VERSION=1.3.2
 ARG LIBWEBP_URL="https://github.com/webmproject/libwebp/archive/v$LIBWEBP_VERSION.tar.gz"
-ARG LIBWEBP_SHA256=51e9297aadb7d9eb99129fe0050f53a11fcce38a0848fb2b0389e385ad93695e
+ARG LIBWEBP_SHA256=c2c2f521fa468e3c5949ab698c2da410f5dce1c5e99f5ad9e70e0e8446b86505
 RUN echo "---- libwebp ----" && \
     wget $WGET_OPTS -O libwebp.tar.gz "$LIBWEBP_URL" && \
     echo "$LIBWEBP_SHA256  libwebp.tar.gz" | sha256sum --status -c - && \
@@ -290,9 +289,9 @@ RUN echo "---- libwebp ----" && \
 # bump: ffmpeg after ./hashupdate Dockerfile FFMPEG $LATEST
 # bump: ffmpeg link "Changelog" https://github.com/FFmpeg/FFmpeg/blob/n$LATEST/Changelog
 # bump: ffmpeg link "Source diff $CURRENT..$LATEST" https://github.com/FFmpeg/FFmpeg/compare/n$CURRENT..n$LATEST
-ARG FFMPEG_VERSION=5.0.1
+ARG FFMPEG_VERSION=6.1.1
 ARG FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2"
-ARG FFMPEG_SHA256=28df33d400a1c1c1b20d07a99197809a3b88ef765f5f07dc1ff067fac64c59d6
+ARG FFMPEG_SHA256=5e3133939a61ef64ac9b47ffd29a5ea6e337a4023ef0ad972094b4da844e3a20
 # sed changes --toolchain=hardened -pie to -static-pie
 # extra ldflags stack-size=2097152 is to increase default stack size from 128KB (musl default) to something
 # more similar to glibc (2MB). This fixing segfault with libaom-av1 and libsvtav1 as they seems to pass
