@@ -151,7 +151,7 @@ while [ $keep_running == 1 ]; do
 						bitrate=$(ffprobe -hide_banner -loglevel 0 -of flat -i "$full_source_path" -select_streams a -show_entries format=bit_rate -of default=noprint_wrappers=1:nokey=1)
 						echo "  Detected bitrate of $bitrate"
 
-						output=$(m4b-tool-pre merge "$full_source_path" -n --audio-codec=libfdk_aac --audio-bitrate="$bitrate" --skip-cover --use-filenames-as-chapters --jobs="$CPUcores" --output-file="$destdir$m4bfilename" --logfile="$destdir$logfilename" 2>&1)
+						output=$(m4b-tool merge "$full_source_path" -n --audio-codec=libfdk_aac --audio-bitrate="$bitrate" --skip-cover --use-filenames-as-chapters --jobs="$CPUcores" --output-file="$destdir$m4bfilename" --logfile="$destdir$logfilename" 2>&1)
 
 						handle_m4btool_output
 					fi
@@ -194,7 +194,7 @@ while [ $keep_running == 1 ]; do
 							echo "  Detected bitrate of $bitrate"
 						fi
 
-						output=$(m4b-tool-pre merge "$full_source_path" -n --audio-codec=libfdk_aac --audio-bitrate="$bitrate" --skip-cover --use-filenames-as-chapters --jobs="$CPUcores" --output-file="$destdir$m4bfilename" --logfile="$destdir$logfilename" 2>&1)
+						output=$(m4b-tool merge "$full_source_path" -n --audio-codec=libfdk_aac --audio-bitrate="$bitrate" --skip-cover --use-filenames-as-chapters --jobs="$CPUcores" --output-file="$destdir$m4bfilename" --logfile="$destdir$logfilename" 2>&1)
 
 						handle_m4btool_output
 					fi
