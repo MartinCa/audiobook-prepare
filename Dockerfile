@@ -1,5 +1,5 @@
-FROM sandreas/tone:v0.1.5 as tone
-FROM alpine:3.16.9 as builder
+FROM docker.io/sandreas/tone:v0.2.4 as tone
+FROM docker.io/library/alpine:3.16.9 as builder
 
 ARG MP4V2_URL="https://github.com/enzo1982/mp4v2/archive/refs/tags/v2.1.3.zip"
 
@@ -38,9 +38,9 @@ RUN echo "---- PREPARE FDKAAC-DEPENDENCIES ----" \
 
 RUN echo "---- COMPILE FDKAAC ENCODER (executable binary for usage of --audio-profile) ----" \
     && cd /tmp/ \
-    && wget https://github.com/nu774/fdkaac/archive/v1.0.5.tar.gz \
-    && tar xzf v1.0.5.tar.gz \
-    && cd fdkaac-1.0.5 \
+    && wget https://github.com/nu774/fdkaac/archive/v1.0.6.tar.gz \
+    && tar xzf v1.0.6.tar.gz \
+    && cd fdkaac-1.0.6 \
     && autoreconf -i && ./configure --enable-static --disable-shared && make -j$(nproc) && make install && rm -rf /tmp/*
 
 ## START FFMPEG BUILD
@@ -134,9 +134,9 @@ RUN echo "---- opencore ----" && \
 # bump: openjpeg /OPENJPEG_VERSION=([\d.]+)/ https://github.com/uclouvain/openjpeg.git|*
 # bump: openjpeg after ./hashupdate Dockerfile OPENJPEG $LATEST
 # bump: openjpeg link "CHANGELOG" https://github.com/uclouvain/openjpeg/blob/master/CHANGELOG.md
-ARG OPENJPEG_VERSION=2.5.2
+ARG OPENJPEG_VERSION=2.5.3
 ARG OPENJPEG_URL="https://github.com/uclouvain/openjpeg/archive/v$OPENJPEG_VERSION.tar.gz"
-ARG OPENJPEG_SHA256=90e3896fed910c376aaf79cdd98bdfdaf98c6472efd8e1debf0a854938cbda6a
+ARG OPENJPEG_SHA256=368fe0468228e767433c9ebdea82ad9d801a3ad1e4234421f352c8b06e7aa707
 RUN echo "---- openjpeg ----" && \
     wget $WGET_OPTS -O openjpeg.tar.gz "$OPENJPEG_URL" && \
     echo "$OPENJPEG_SHA256  openjpeg.tar.gz" | sha256sum --status -c - && \
@@ -275,9 +275,9 @@ RUN echo "---- vorbis ----" && \
 # bump: libwebp after ./hashupdate Dockerfile LIBWEBP $LATEST
 # bump: libwebp link "Release notes" https://github.com/webmproject/libwebp/releases/tag/v$LATEST
 # bump: libwebp link "Source diff $CURRENT..$LATEST" https://github.com/webmproject/libwebp/compare/v$CURRENT..v$LATEST
-ARG LIBWEBP_VERSION=1.3.2
+ARG LIBWEBP_VERSION=1.5.0
 ARG LIBWEBP_URL="https://github.com/webmproject/libwebp/archive/v$LIBWEBP_VERSION.tar.gz"
-ARG LIBWEBP_SHA256=c2c2f521fa468e3c5949ab698c2da410f5dce1c5e99f5ad9e70e0e8446b86505
+ARG LIBWEBP_SHA256=668c9aba45565e24c27e17f7aaf7060a399f7f31dba6c97a044e1feacb930f37
 RUN echo "---- libwebp ----" && \
     wget $WGET_OPTS -O libwebp.tar.gz "$LIBWEBP_URL" && \
     echo "$LIBWEBP_SHA256  libwebp.tar.gz" | sha256sum --status -c - && \
@@ -289,9 +289,9 @@ RUN echo "---- libwebp ----" && \
 # bump: ffmpeg after ./hashupdate Dockerfile FFMPEG $LATEST
 # bump: ffmpeg link "Changelog" https://github.com/FFmpeg/FFmpeg/blob/n$LATEST/Changelog
 # bump: ffmpeg link "Source diff $CURRENT..$LATEST" https://github.com/FFmpeg/FFmpeg/compare/n$CURRENT..n$LATEST
-ARG FFMPEG_VERSION=6.1.1
+ARG FFMPEG_VERSION=6.1.2
 ARG FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2"
-ARG FFMPEG_SHA256=5e3133939a61ef64ac9b47ffd29a5ea6e337a4023ef0ad972094b4da844e3a20
+ARG FFMPEG_SHA256=62fe9fd098cb537d4b61731b11049e1ac179f38c870a41b8e9d556af944edb45
 # sed changes --toolchain=hardened -pie to -static-pie
 # extra ldflags stack-size=2097152 is to increase default stack size from 128KB (musl default) to something
 # more similar to glibc (2MB). This fixing segfault with libaom-av1 and libsvtav1 as they seems to pass
@@ -416,10 +416,10 @@ COPY --from=builder /usr/local/bin/ffprobe /usr/local/bin/
 COPY --from=tone /usr/local/bin/tone /usr/local/bin/
 
 # m4b-tool
-ARG M4B_TOOL_DOWNLOAD_LINK="https://github.com/sandreas/m4b-tool/releases/latest/download/m4b-tool.tar.gz"
+ARG M4B_TOOL_DOWNLOAD_LINK="https://github.com/sandreas/m4b-tool/releases/latest/download/m4b-tool.phar"
 RUN echo "---- INSTALL M4B-TOOL ----" \
     && if [ ! -f /tmp/m4b-tool.phar ]; then \
-    wget "${M4B_TOOL_DOWNLOAD_LINK}" -O /tmp/m4b-tool.tar.gz && \
+    wget "${M4B_TOOL_DOWNLOAD_LINK}" -O /tmp/m4b-tool.phar && \
     if [ ! -f /tmp/m4b-tool.phar ]; then \
     tar xzf /tmp/m4b-tool.tar.gz -C /tmp/ && rm /tmp/m4b-tool.tar.gz ;\
     fi \
