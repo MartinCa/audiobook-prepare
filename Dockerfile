@@ -1,5 +1,5 @@
 FROM docker.io/sandreas/tone:v0.2.4 as tone
-FROM docker.io/library/alpine:3.16.9 as builder
+FROM docker.io/library/alpine:3.19 as builder
 
 ARG MP4V2_URL="https://github.com/enzo1982/mp4v2/archive/refs/tags/v2.1.3.zip"
 
@@ -72,7 +72,8 @@ RUN echo "---- INSTALL FFMPEG BUILD DEPENDENCIES ----" && \
     jq \
     zlib-dev zlib-static \
     bzip2-dev bzip2-static \
-    libxml2-dev \
+    libxml2-dev libxml2-static \
+    xz-dev xz-static \
     expat-dev expat-static \
     fontconfig-dev fontconfig-static \
     freetype freetype-dev freetype-static \
@@ -379,7 +380,7 @@ RUN echo "---- output versions ----" && \
 #     && apk del --purge build-dependencies && rm -rf /tmp/*
 
 ## Actual image
-FROM alpine:3.16.2
+FROM alpine:3.19
 
 RUN echo "---- INSTALL RUNTIME PACKAGES ----" && \
     apk add --no-cache --update --upgrade \
@@ -388,17 +389,19 @@ RUN echo "---- INSTALL RUNTIME PACKAGES ----" && \
     # mp4v2: required libraries
     libstdc++ \
     # m4b-tool: php cli, required extensions and php settings
-    php8-cli \
-    php8-dom \
-    php8-json \
-    php8-xml \
-    php8-mbstring \
-    php8-phar \
-    php8-tokenizer \
-    php8-xmlwriter \
-    php8-openssl \
-    && echo "date.timezone = UTC" >> /etc/php8/php.ini \
-    && ln -s /usr/bin/php8 /bin/php
+    php82-cli \
+    php82-dom \
+    php82-xml \
+    php82-mbstring \
+    php82-phar \
+    php82-tokenizer \
+    php82-xmlwriter \
+    php82-openssl \
+    php82-curl \
+    php82-simplexml \
+    php82-zip \
+    && echo "date.timezone = UTC" >> /etc/php82/php.ini \
+    && ln -s /usr/bin/php82 /bin/php
 
 
 # mp4v2

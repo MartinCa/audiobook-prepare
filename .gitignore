@@ -1,0 +1,31 @@
+# Claude Code
+.claude/
+
+# Environment and secrets
+.env
+*.env.local
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test directories
+input/
+output/
+failed/
+ebookfiles/
+config/
+
+# Docker
+docker-compose.override.yml
