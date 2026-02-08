@@ -12,4 +12,4 @@ User uid: $(id -u appuser)
 User gid: $(id -g appuser)
 "
 
-su -c "sh /app/process_mp3merge.sh" -m appuser
+su -c "/app/process_mp3merge.sh" -m appuser

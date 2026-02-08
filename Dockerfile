@@ -1,5 +1,5 @@
-FROM docker.io/sandreas/tone:v0.2.4 as tone
-FROM docker.io/library/alpine:3.19 as builder
+FROM docker.io/sandreas/tone:v0.2.5 as tone
+FROM docker.io/library/alpine:3.21 as builder
 
 ARG MP4V2_URL="https://github.com/enzo1982/mp4v2/archive/refs/tags/v2.1.3.zip"
 
@@ -135,9 +135,9 @@ RUN echo "---- opencore ----" && \
 # bump: openjpeg /OPENJPEG_VERSION=([\d.]+)/ https://github.com/uclouvain/openjpeg.git|*
 # bump: openjpeg after ./hashupdate Dockerfile OPENJPEG $LATEST
 # bump: openjpeg link "CHANGELOG" https://github.com/uclouvain/openjpeg/blob/master/CHANGELOG.md
-ARG OPENJPEG_VERSION=2.5.3
+ARG OPENJPEG_VERSION=2.5.4
 ARG OPENJPEG_URL="https://github.com/uclouvain/openjpeg/archive/v$OPENJPEG_VERSION.tar.gz"
-ARG OPENJPEG_SHA256=368fe0468228e767433c9ebdea82ad9d801a3ad1e4234421f352c8b06e7aa707
+ARG OPENJPEG_SHA256=a695fbe19c0165f295a8531b1e4e855cd94d0875d2f88ec4b61080677e27188a
 RUN echo "---- openjpeg ----" && \
     wget $WGET_OPTS -O openjpeg.tar.gz "$OPENJPEG_URL" && \
     echo "$OPENJPEG_SHA256  openjpeg.tar.gz" | sha256sum --status -c - && \
@@ -159,9 +159,9 @@ RUN echo "---- openjpeg ----" && \
 # bump: opus after ./hashupdate Dockerfile OPUS $LATEST
 # bump: opus link "Release notes" https://github.com/xiph/opus/releases/tag/v$LATEST
 # bump: opus link "Source diff $CURRENT..$LATEST" https://github.com/xiph/opus/compare/v$CURRENT..v$LATEST
-ARG OPUS_VERSION=1.3.1
-ARG OPUS_URL="https://archive.mozilla.org/pub/opus/opus-$OPUS_VERSION.tar.gz"
-ARG OPUS_SHA256=65b58e1e25b2a114157014736a3d9dfeaad8d41be1c8179866f144a2fb44ff9d
+ARG OPUS_VERSION=1.6.1
+ARG OPUS_URL="https://downloads.xiph.org/releases/opus/opus-$OPUS_VERSION.tar.gz"
+ARG OPUS_SHA256=6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1
 RUN echo "---- opus ----" && \
     wget $WGET_OPTS -O opus.tar.gz "$OPUS_URL" && \
     echo "$OPUS_SHA256  opus.tar.gz" | sha256sum --status -c - && \
@@ -202,9 +202,9 @@ RUN echo "---- speex ----" && \
 # bump: ogg after ./hashupdate Dockerfile OGG $LATEST
 # bump: ogg link "CHANGES" https://github.com/xiph/ogg/blob/master/CHANGES
 # bump: ogg link "Source diff $CURRENT..$LATEST" https://github.com/xiph/ogg/compare/v$CURRENT..v$LATEST
-ARG OGG_VERSION=1.3.5
+ARG OGG_VERSION=1.3.6
 ARG OGG_URL="https://downloads.xiph.org/releases/ogg/libogg-$OGG_VERSION.tar.gz"
-ARG OGG_SHA256=0eb4b4b9420a0f51db142ba3f9c64b333f826532dc0f48c6410ae51f4799b664
+ARG OGG_SHA256=83e6704730683d004d20e21b8f7f55dcb3383cdf84c0daedf30bde175f774638
 RUN echo "---- ogg ----" && \
     wget $WGET_OPTS -O libogg.tar.gz "$OGG_URL" && \
     echo "$OGG_SHA256  libogg.tar.gz" | sha256sum --status -c - && \
@@ -276,9 +276,9 @@ RUN echo "---- vorbis ----" && \
 # bump: libwebp after ./hashupdate Dockerfile LIBWEBP $LATEST
 # bump: libwebp link "Release notes" https://github.com/webmproject/libwebp/releases/tag/v$LATEST
 # bump: libwebp link "Source diff $CURRENT..$LATEST" https://github.com/webmproject/libwebp/compare/v$CURRENT..v$LATEST
-ARG LIBWEBP_VERSION=1.5.0
+ARG LIBWEBP_VERSION=1.6.0
 ARG LIBWEBP_URL="https://github.com/webmproject/libwebp/archive/v$LIBWEBP_VERSION.tar.gz"
-ARG LIBWEBP_SHA256=668c9aba45565e24c27e17f7aaf7060a399f7f31dba6c97a044e1feacb930f37
+ARG LIBWEBP_SHA256=93a852c2b3efafee3723efd4636de855b46f9fe1efddd607e1f42f60fc8f2136
 RUN echo "---- libwebp ----" && \
     wget $WGET_OPTS -O libwebp.tar.gz "$LIBWEBP_URL" && \
     echo "$LIBWEBP_SHA256  libwebp.tar.gz" | sha256sum --status -c - && \
@@ -286,13 +286,13 @@ RUN echo "---- libwebp ----" && \
     cd libwebp-* && ./autogen.sh && ./configure --disable-shared --enable-static --with-pic --enable-libwebpmux --disable-libwebpextras --disable-libwebpdemux --disable-sdl --disable-gl --disable-png --disable-jpeg --disable-tiff --disable-gif && \
     make -j$(nproc) install
 
-# bump: ffmpeg /FFMPEG_VERSION=([\d.]+)/ https://github.com/FFmpeg/FFmpeg.git|^5
+# bump: ffmpeg /FFMPEG_VERSION=([\d.]+)/ https://github.com/FFmpeg/FFmpeg.git|^7
 # bump: ffmpeg after ./hashupdate Dockerfile FFMPEG $LATEST
 # bump: ffmpeg link "Changelog" https://github.com/FFmpeg/FFmpeg/blob/n$LATEST/Changelog
 # bump: ffmpeg link "Source diff $CURRENT..$LATEST" https://github.com/FFmpeg/FFmpeg/compare/n$CURRENT..n$LATEST
-ARG FFMPEG_VERSION=6.1.2
+ARG FFMPEG_VERSION=7.1.1
 ARG FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2"
-ARG FFMPEG_SHA256=62fe9fd098cb537d4b61731b11049e1ac179f38c870a41b8e9d556af944edb45
+ARG FFMPEG_SHA256=0c8da2f11579a01e014fc007cbacf5bb4da1d06afd0b43c7f8097ec7c0f143ba
 # sed changes --toolchain=hardened -pie to -static-pie
 # extra ldflags stack-size=2097152 is to increase default stack size from 128KB (musl default) to something
 # more similar to glibc (2MB). This fixing segfault with libaom-av1 and libsvtav1 as they seems to pass
@@ -380,7 +380,7 @@ RUN echo "---- output versions ----" && \
 #     && apk del --purge build-dependencies && rm -rf /tmp/*
 
 ## Actual image
-FROM alpine:3.19
+FROM alpine:3.21
 
 RUN echo "---- INSTALL RUNTIME PACKAGES ----" && \
     apk add --no-cache --update --upgrade \
@@ -388,20 +388,22 @@ RUN echo "---- INSTALL RUNTIME PACKAGES ----" && \
     shadow \
     # mp4v2: required libraries
     libstdc++ \
+    # bash for process script
+    bash \
     # m4b-tool: php cli, required extensions and php settings
-    php82-cli \
-    php82-dom \
-    php82-xml \
-    php82-mbstring \
-    php82-phar \
-    php82-tokenizer \
-    php82-xmlwriter \
-    php82-openssl \
-    php82-curl \
-    php82-simplexml \
-    php82-zip \
-    && echo "date.timezone = UTC" >> /etc/php82/php.ini \
-    && ln -s /usr/bin/php82 /bin/php
+    php84-cli \
+    php84-dom \
+    php84-xml \
+    php84-mbstring \
+    php84-phar \
+    php84-tokenizer \
+    php84-xmlwriter \
+    php84-openssl \
+    php84-curl \
+    php84-simplexml \
+    php84-zip \
+    && echo "date.timezone = UTC" >> /etc/php84/php.ini \
+    && ln -s /usr/bin/php84 /bin/php
 
 
 # mp4v2

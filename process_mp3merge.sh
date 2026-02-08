@@ -70,7 +70,7 @@ handle_m4btool_output() {
 			if [ -f "$destdir$logfilename" ]; then
 				# If there is a logfile in the output dir that indicates an error
 				chmod a=,a+rwX "$destdir$logfilename"
-				logerror=cat "$destdir$logfilename"
+				logerror=$(cat "$destdir$logfilename")
 			else
 				# If output file does not exist something must have gone wrong
 				logerror="Output file '$m4bfilename' missing"
@@ -203,7 +203,7 @@ while [ $keep_running == 1 ]; do
 				# Move ebook files
 				numberofebookfiles=$(find "$dir_item" -type f \( -name "*.mobi" -o -name "*.pdf" -o -name "*.epub" -o -name "*.azw" -o -name "*.azw3" \) | wc -l)
 
-				if [[ $numberofebookfiles > 0 ]]; then
+				if [[ $numberofebookfiles -gt 0 ]]; then
 					mkdir -p "$ebookfilesdir$dir_item"
 					find "$dir_item" -type f \( -name "*.mobi" -o -name "*.pdf" -o -name "*.epub" -o -name "*.azw" -o -name "*.azw3" \) -exec cp '{}' "$ebookfilesdir"'{}' \; -exec echo "  Moved ebook file to $ebookfilesdir"'{}' \;
 					echo "$(date -I'seconds') MOVED Ebook files for $dir_item" >>"$logfile"

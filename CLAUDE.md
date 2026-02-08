@@ -20,6 +20,8 @@ podman compose up --build
 podman compose build --no-cache
 ```
 
+**Note:** A full build from scratch compiles FFmpeg and many audio codecs, which can take 10-20+ minutes depending on hardware. Subsequent builds with cache are much faster.
+
 ## Architecture
 
 ### Docker Multi-Stage Build
