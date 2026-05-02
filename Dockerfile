@@ -1,10 +1,27 @@
 FROM docker.io/sandreas/tone:v0.2.5 as tone
 FROM docker.io/library/alpine:3.21 as builder
 
-ARG MP4V2_URL="https://github.com/enzo1982/mp4v2/archive/refs/tags/v2.1.3.zip"
+# bump: mp4v2 /MP4V2_VERSION=([\d.]+)/ https://github.com/enzo1982/mp4v2.git|*
+# bump: mp4v2 after ./hashupdate Dockerfile MP4V2 $LATEST
+# bump: mp4v2 link "Release notes" https://github.com/enzo1982/mp4v2/releases/tag/v$LATEST
+ARG MP4V2_VERSION=2.1.3
+ARG MP4V2_URL="https://github.com/enzo1982/mp4v2/archive/refs/tags/v$MP4V2_VERSION.zip"
+ARG MP4V2_SHA256=9c02b94db3b3f07ef961ec2220ff616ae283616b263d00f944f9f56c5d0a45e1
 
+# bump: fdk-aac /FDK_AAC_VERSION=([\d.]+)/ https://github.com/mstorsjo/fdk-aac.git|*
+# bump: fdk-aac after ./hashupdate Dockerfile FDK_AAC $LATEST
+# bump: fdk-aac link "ChangeLog" https://github.com/mstorsjo/fdk-aac/blob/master/ChangeLog
+# bump: fdk-aac link "Source diff $CURRENT..$LATEST" https://github.com/mstorsjo/fdk-aac/compare/v$CURRENT..v$LATEST
 ARG FDK_AAC_VERSION=2.0.3
 ARG FDK_AAC_URL="https://github.com/mstorsjo/fdk-aac/archive/v$FDK_AAC_VERSION.tar.gz"
+ARG FDK_AAC_SHA256=e25671cd96b10bad896aa42ab91a695a9e573395262baed4e4a2ff178d6a3a78
+
+# bump: fdkaac /FDKAAC_VERSION=([\d.]+)/ https://github.com/nu774/fdkaac.git|*
+# bump: fdkaac after ./hashupdate Dockerfile FDKAAC $LATEST
+# bump: fdkaac link "Release notes" https://github.com/nu774/fdkaac/releases/tag/v$LATEST
+ARG FDKAAC_VERSION=1.0.6
+ARG FDKAAC_URL="https://github.com/nu774/fdkaac/archive/v$FDKAAC_VERSION.tar.gz"
+ARG FDKAAC_SHA256=ed34c8dcae3d49d385e1ceaa380c5871cda744402358c61bcb49950a25bfae58
 
 # Reference: https://github.com/sandreas/dockerhub-builds
 
@@ -15,6 +32,7 @@ RUN echo "---- INSTALL BUILD DEPENDENCIES ----" \
     automake \
     boost-dev \
     build-base \
+    coreutils \
     gcc \
     git \
     tar \
@@ -23,6 +41,7 @@ RUN echo "---- INSTALL BUILD DEPENDENCIES ----" \
 RUN echo "---- COMPILE MP4V2 ----" \
     && cd /tmp/ \
     && wget "${MP4V2_URL}" -O mp4v2.zip \
+    && echo "$MP4V2_SHA256  mp4v2.zip" | sha256sum --status -c - \
     && unzip mp4v2.zip \
     && cd mp4v2* \
     && autoreconf -fiv \
@@ -33,14 +52,16 @@ RUN echo "---- COMPILE MP4V2 ----" \
 RUN echo "---- PREPARE FDKAAC-DEPENDENCIES ----" \
     && cd /tmp/ \
     && wget -O fdk-aac.tar.gz "$FDK_AAC_URL" \
+    && echo "$FDK_AAC_SHA256  fdk-aac.tar.gz" | sha256sum --status -c - \
     && tar xfz fdk-aac.tar.gz \
     && cd fdk-aac-* && ./autogen.sh && ./configure --enable-static --disable-shared && make -j$(nproc) install
 
 RUN echo "---- COMPILE FDKAAC ENCODER (executable binary for usage of --audio-profile) ----" \
     && cd /tmp/ \
-    && wget https://github.com/nu774/fdkaac/archive/v1.0.6.tar.gz \
-    && tar xzf v1.0.6.tar.gz \
-    && cd fdkaac-1.0.6 \
+    && wget -O fdkaac.tar.gz "$FDKAAC_URL" \
+    && echo "$FDKAAC_SHA256  fdkaac.tar.gz" | sha256sum --status -c - \
+    && tar xzf fdkaac.tar.gz \
+    && cd fdkaac-* \
     && autoreconf -i && ./configure --enable-static --disable-shared && make -j$(nproc) && make install && rm -rf /tmp/*
 
 ## START FFMPEG BUILD
@@ -60,7 +81,6 @@ ARG WGET_OPTS="--retry-on-host-error --retry-on-http-error=429,500,502,503"
 
 RUN echo "---- INSTALL FFMPEG BUILD DEPENDENCIES ----" && \
     apk add --no-cache \
-    coreutils \
     rust cargo \
     openssl-dev openssl-libs-static \
     ca-certificates \
@@ -95,10 +115,6 @@ RUN echo "---- INSTALL FFMPEG BUILD DEPENDENCIES ----" && \
     xxd
 
 # Removed because fdk-aac is build above
-# bump: fdk-aac /FDK_AAC_VERSION=([\d.]+)/ https://github.com/mstorsjo/fdk-aac.git|*
-# bump: fdk-aac after ./hashupdate Dockerfile FDK_AAC $LATEST
-# bump: fdk-aac link "ChangeLog" https://github.com/mstorsjo/fdk-aac/blob/master/ChangeLog
-# bump: fdk-aac link "Source diff $CURRENT..$LATEST" https://github.com/mstorsjo/fdk-aac/compare/v$CURRENT..v$LATEST
 # RUN \
 #   wget $WGET_OPTS -O fdk-aac.tar.gz "$FDK_AAC_URL" && \
 #   echo "$FDK_AAC_SHA256  fdk-aac.tar.gz" | sha256sum --status -c - && \
@@ -257,10 +273,10 @@ RUN echo "---- vorbis ----" && \
     make -j$(nproc) install
 
 
-# bump: libvpx /VPX_VERSION=([\d.]+)/ https://github.com/webmproject/libvpx.git|*
-# bump: libvpx after ./hashupdate Dockerfile VPX $LATEST
-# bump: libvpx link "CHANGELOG" https://github.com/webmproject/libvpx/blob/master/CHANGELOG
-# bump: libvpx link "Source diff $CURRENT..$LATEST" https://github.com/webmproject/libvpx/compare/v$CURRENT..v$LATEST
+#bump: libvpx /VPX_VERSION=([\d.]+)/ https://github.com/webmproject/libvpx.git|*
+#bump: libvpx after ./hashupdate Dockerfile VPX $LATEST
+#bump: libvpx link "CHANGELOG" https://github.com/webmproject/libvpx/blob/master/CHANGELOG
+#bump: libvpx link "Source diff $CURRENT..$LATEST" https://github.com/webmproject/libvpx/compare/v$CURRENT..v$LATEST
 #ARG VPX_VERSION=1.12.0
 #ARG VPX_URL="https://github.com/webmproject/libvpx/archive/v$VPX_VERSION.tar.gz"
 #ARG VPX_SHA256=f1acc15d0fd0cb431f4bf6eac32d5e932e40ea1186fe78e074254d6d003957bb
