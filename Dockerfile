@@ -1,5 +1,5 @@
 FROM docker.io/sandreas/tone:v0.2.5 as tone
-FROM docker.io/library/alpine:3.21 as builder
+FROM docker.io/library/alpine:3.23 as builder
 
 ARG MP4V2_URL="https://github.com/enzo1982/mp4v2/archive/refs/tags/v2.1.3.zip"
 
@@ -380,7 +380,7 @@ RUN echo "---- output versions ----" && \
 #     && apk del --purge build-dependencies && rm -rf /tmp/*
 
 ## Actual image
-FROM docker.io/library/alpine:3.21
+FROM docker.io/library/alpine:3.23
 
 RUN echo "---- INSTALL RUNTIME PACKAGES ----" && \
     apk add --no-cache --update --upgrade \
