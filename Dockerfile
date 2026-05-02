@@ -81,7 +81,6 @@ ARG WGET_OPTS="--retry-on-host-error --retry-on-http-error=429,500,502,503"
 
 RUN echo "---- INSTALL FFMPEG BUILD DEPENDENCIES ----" && \
     apk add --no-cache \
-    coreutils \
     rust cargo \
     openssl-dev openssl-libs-static \
     ca-certificates \
