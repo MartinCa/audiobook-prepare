@@ -32,6 +32,7 @@ RUN echo "---- INSTALL BUILD DEPENDENCIES ----" \
     automake \
     boost-dev \
     build-base \
+    coreutils \
     gcc \
     git \
     tar \
