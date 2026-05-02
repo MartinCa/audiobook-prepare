@@ -1,5 +1,5 @@
-FROM docker.io/sandreas/tone:v0.2.5 as tone
-FROM docker.io/library/alpine:3.23 as builder
+FROM docker.io/sandreas/tone:v0.2.5 AS tone
+FROM docker.io/library/alpine:3.23 AS builder
 
 # bump: mp4v2 /MP4V2_VERSION=([\d.]+)/ https://github.com/enzo1982/mp4v2.git|*
 # bump: mp4v2 after ./hashupdate Dockerfile MP4V2 $LATEST
