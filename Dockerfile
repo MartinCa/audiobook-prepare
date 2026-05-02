@@ -1,5 +1,5 @@
 FROM docker.io/sandreas/tone:v0.2.5 as tone
-FROM docker.io/library/alpine:3.21 as builder
+FROM docker.io/library/alpine:3.23 as builder
 
 # bump: mp4v2 /MP4V2_VERSION=([\d.]+)/ https://github.com/enzo1982/mp4v2.git|*
 # bump: mp4v2 after ./hashupdate Dockerfile MP4V2 $LATEST
@@ -396,7 +396,7 @@ RUN echo "---- output versions ----" && \
 #     && apk del --purge build-dependencies && rm -rf /tmp/*
 
 ## Actual image
-FROM docker.io/library/alpine:3.21
+FROM docker.io/library/alpine:3.23
 
 RUN echo "---- INSTALL RUNTIME PACKAGES ----" && \
     apk add --no-cache --update --upgrade \
@@ -407,19 +407,19 @@ RUN echo "---- INSTALL RUNTIME PACKAGES ----" && \
     # bash for process script
     bash \
     # m4b-tool: php cli, required extensions and php settings
-    php84-cli \
-    php84-dom \
-    php84-xml \
-    php84-mbstring \
-    php84-phar \
-    php84-tokenizer \
-    php84-xmlwriter \
-    php84-openssl \
-    php84-curl \
-    php84-simplexml \
-    php84-zip \
-    && echo "date.timezone = UTC" >> /etc/php84/php.ini \
-    && ln -s /usr/bin/php84 /bin/php
+    php85-cli \
+    php85-dom \
+    php85-xml \
+    php85-mbstring \
+    php85-phar \
+    php85-tokenizer \
+    php85-xmlwriter \
+    php85-openssl \
+    php85-curl \
+    php85-simplexml \
+    php85-zip \
+    && echo "date.timezone = UTC" >> /etc/php85/php.ini \
+    && ln -s /usr/bin/php85 /bin/php
 
 
 # mp4v2
