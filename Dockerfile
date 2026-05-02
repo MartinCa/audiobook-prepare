@@ -380,7 +380,7 @@ RUN echo "---- output versions ----" && \
 #     && apk del --purge build-dependencies && rm -rf /tmp/*
 
 ## Actual image
-FROM alpine:3.21
+FROM docker.io/library/alpine:3.21
 
 RUN echo "---- INSTALL RUNTIME PACKAGES ----" && \
     apk add --no-cache --update --upgrade \
