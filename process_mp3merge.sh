@@ -213,15 +213,11 @@ while [ $keep_running == 1 ]; do
 
 			if [ $cmdresult == 0 ]; then
 				echo "  Processing succeeded"
-				if [ -d "$full_source_path" ]; then
-					rm "$full_source_path" -r
-				elif [ -f "$full_source_path" ]; then
-					rm "$full_source_path"
-				fi
+				rm -rf "$full_source_path"
 				echo "$(date -I'seconds') SUCCESS $action $dir_item" >>"$logfile"
 			else
 				echo "  ERROR: Processing failed: $logerror"
-				mv "$full_source_path" "$faileddir"
+				cp -r "$full_source_path" "$faileddir" && rm -rf "$full_source_path"
 				echo "$(date -I'seconds') FAILED $action $dir_item: $logerror" >>"$logfile"
 			fi
 		else
