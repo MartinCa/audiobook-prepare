@@ -1,0 +1,24 @@
+name: Bump versions
+
+on:
+  schedule:
+    # Every Monday at 09:00 UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Bump versions
+        uses: wader/bump/action@771bb30f8fb13ad5867dacec5ccadd43b89e777e # master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
