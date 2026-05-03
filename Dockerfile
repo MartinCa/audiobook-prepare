@@ -232,9 +232,9 @@ RUN echo "---- ogg ----" && \
 # bump: theora after ./hashupdate Dockerfile THEORA $LATEST
 # bump: theora link "Release notes" https://github.com/xiph/theora/releases/tag/v$LATEST
 # bump: theora link "Source diff $CURRENT..$LATEST" https://github.com/xiph/theora/compare/v$CURRENT..v$LATEST
-ARG THEORA_VERSION=1.1.1
+ARG THEORA_VERSION=1.2.0
 ARG THEORA_URL="https://github.com/xiph/theora/archive/v$THEORA_VERSION.tar.gz"
-ARG THEORA_SHA256=1d5c3b25bbced448f3e741c42df6796e3d5e57136a74bcd68262318290ec2982
+ARG THEORA_SHA256=e0c35771b425c32a052ffb358a2aed14219340ab850b48dc85b01939c0513a31
 RUN echo "---- theora ----" && \
     wget $WGET_OPTS -O libtheora.tar.gz "$THEORA_URL" && \
     echo "$THEORA_SHA256  libtheora.tar.gz" | sha256sum --status -c - && \
