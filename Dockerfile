@@ -1,8 +1,5 @@
 FROM docker.io/library/alpine:3.23 AS builder
 
-# retry dns and some http codes that might be transient errors
-ARG WGET_OPTS="--retry-on-host-error --retry-on-http-error=429,500,502,503"
-
 RUN echo "---- INSTALL BUILD DEPENDENCIES ----" && \
     apk add --no-cache \
     autoconf \
@@ -10,8 +7,8 @@ RUN echo "---- INSTALL BUILD DEPENDENCIES ----" && \
     libtool \
     build-base \
     ca-certificates \
+    curl \
     pkgconf \
-    wget \
     nasm \
     yasm \
     bzip2 \
@@ -25,23 +22,12 @@ RUN echo "---- INSTALL BUILD DEPENDENCIES ----" && \
 ARG FDK_AAC_VERSION=2.0.3
 ARG FDK_AAC_URL="https://github.com/mstorsjo/fdk-aac/archive/v$FDK_AAC_VERSION.tar.gz"
 ARG FDK_AAC_SHA256=e25671cd96b10bad896aa42ab91a695a9e573395262baed4e4a2ff178d6a3a78
-RUN echo "---- FDK-AAC: download ----" && \
-    cd /tmp && \
-    wget $WGET_OPTS -O fdk-aac.tar.gz "$FDK_AAC_URL" && \
-    echo "$FDK_AAC_SHA256  fdk-aac.tar.gz" | sha256sum --status -c -
-
-RUN echo "---- FDK-AAC: extract ----" && \
-    tar xf /tmp/fdk-aac.tar.gz -C /tmp
-
-RUN echo "---- FDK-AAC: autogen ----" && \
-    cd /tmp/fdk-aac-${FDK_AAC_VERSION} && ./autogen.sh
-
-RUN echo "---- FDK-AAC: configure ----" && \
-    cd /tmp/fdk-aac-${FDK_AAC_VERSION} && \
-    ./configure --enable-static --disable-shared
-
-RUN echo "---- FDK-AAC: make install ----" && \
-    cd /tmp/fdk-aac-${FDK_AAC_VERSION} && \
+RUN echo "---- COMPILE FDK-AAC ----" && \
+    curl -fsSL --retry 3 -o /tmp/fdk-aac.tar.gz "$FDK_AAC_URL" && \
+    echo "$FDK_AAC_SHA256  /tmp/fdk-aac.tar.gz" | sha256sum --status -c - && \
+    tar xf /tmp/fdk-aac.tar.gz -C /tmp && \
+    cd /tmp/fdk-aac-${FDK_AAC_VERSION} && ./autogen.sh && \
+    ./configure --enable-static --disable-shared && \
     make -j$(nproc) install && \
     rm -rf /tmp/fdk-aac*
 
@@ -65,10 +51,10 @@ ARG FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2"
 ARG FFMPEG_SHA256=e7df715136a1231598dadb70fe6abd5cd66abc1ac2f470a02c567b2600c5292b
 # sed changes --toolchain=hardened -pie to -static-pie
 RUN echo "---- FFMPEG BUILD ----" && \
-    wget $WGET_OPTS -O ffmpeg.tar.bz2 "$FFMPEG_URL" && \
-    echo "$FFMPEG_SHA256  ffmpeg.tar.bz2" | sha256sum --status -c - && \
-    tar xf ffmpeg.tar.bz2 && \
-    cd ffmpeg-* && \
+    curl -fsSL --retry 3 -o /tmp/ffmpeg.tar.bz2 "$FFMPEG_URL" && \
+    echo "$FFMPEG_SHA256  /tmp/ffmpeg.tar.bz2" | sha256sum --status -c - && \
+    tar xf /tmp/ffmpeg.tar.bz2 -C /tmp && \
+    cd /tmp/ffmpeg-* && \
     sed -i 's/add_ldexeflags -fPIE -pie/add_ldexeflags -fPIE -static-pie/' configure && \
     ./configure \
     --pkg-config-flags="--static" \
