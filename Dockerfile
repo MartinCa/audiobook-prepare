@@ -1,4 +1,4 @@
-FROM docker.io/library/alpine:3.23 AS builder
+FROM docker.io/library/alpine:3.19 AS builder
 
 # retry dns and some http codes that might be transient errors
 ARG WGET_OPTS="--retry-on-host-error --retry-on-http-error=429,500,502,503"
