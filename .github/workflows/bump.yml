@@ -29,7 +29,9 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
 
       - name: Configure git credentials
-        run: git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: git config --global url."https://x-access-token:${APP_TOKEN}@github.com/".insteadOf "https://github.com/"
 
       - name: Bump versions
         uses: wader/bump/action@771bb30f8fb13ad5867dacec5ccadd43b89e777e # master
