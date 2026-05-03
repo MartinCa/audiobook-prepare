@@ -241,7 +241,7 @@ RUN echo "---- theora ----" && \
     tar xf libtheora.tar.gz && \
     # --build=$(arch)-unknown-linux-gnu helps with guessing the correct build. For some reason,
     # build script can't guess the build type in arm64 (hardware and emulated) environment.
-    cd theora-* && ./configure --build=$(arch)-unknown-linux-gnu --disable-examples --disable-oggtest --disable-shared --enable-static && \
+    cd theora-* && ./autogen.sh && ./configure --build=$(arch)-unknown-linux-gnu --disable-examples --disable-oggtest --disable-shared --enable-static && \
     make -j$(nproc) install
 
 
