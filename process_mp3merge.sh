@@ -6,7 +6,6 @@ faileddir="/failed/"
 ebookfilesdir="/ebookfiles/"
 logfile="/config/processing.log"
 m4bext=".m4b"
-logext=".log"
 internaluntaggeddir="/untagged/"
 
 cd "$mp3mergedir"
@@ -17,7 +16,7 @@ mkdir -p "$untaggeddir"
 mkdir -p "$faileddir"
 mkdir -p "$ebookfilesdir"
 
-# CPU Cores used for m4b-tool
+# CPU Cores used for ffmpeg encoding threads
 if [ -z "$CPU_CORES" ]; then
 	echo "Using all CPU cores as CPU_CORES ENV not set."
 	CPUcores=$(nproc --all)
@@ -60,49 +59,108 @@ is_media_file() {
 	return 1
 }
 
-handle_m4btool_output() {
-	if [ "$output" ]; then
-		# m4b-tool only outputs errors so any output is indication of an error
-		logerror="$output"
-		cmdresult=99
-	else
-		if [ -f "$destdir$logfilename" ] || [ ! -f "$destdir$m4bfilename" ]; then
-			if [ -f "$destdir$logfilename" ]; then
-				# If there is a logfile in the output dir that indicates an error
-				chmod a=,a+rwX "$destdir$logfilename"
-				logerror=$(cat "$destdir$logfilename")
-			else
-				# If output file does not exist something must have gone wrong
-				logerror="Output file '$m4bfilename' missing"
-			fi
-			cmdresult=99
-		else
-			echo "  Setting permissions and deleting temporary files"
-			chmod -R a=,a+rwX "$destdir"
+get_audio_bitrate() {
+	local file="$1"
+	local bitrate
 
-			chaptersfile="$destdir$filename_excl_ext".chapters.txt
-			if [ -f "$chaptersfile" ]; then
-				rm $chaptersfile
-			fi
-			tmpfilesdir="$destdir$filename_excl_ext"-tmpfiles
-			if [ -d "$tmpfilesdir" ]; then
-				rmdir "$tmpfilesdir"
-			fi
+	# Try stream-level bitrate first (more accurate for VBR formats)
+	bitrate=$(ffprobe -hide_banner -loglevel quiet \
+		-select_streams a:0 \
+		-show_entries stream=bit_rate \
+		-of default=noprint_wrappers=1:nokey=1 \
+		-i "$file" 2>/dev/null)
 
-			cmdresult=0
-		fi
+	# Fall back to container bitrate
+	if [ -z "$bitrate" ] || [ "$bitrate" = "N/A" ]; then
+		bitrate=$(ffprobe -hide_banner -loglevel quiet \
+			-show_entries format=bit_rate \
+			-of default=noprint_wrappers=1:nokey=1 \
+			-i "$file" 2>/dev/null)
 	fi
 
-	if [ $cmdresult != 0 ]; then
-		echo "  Cleaning up failed output"
-		if [ -f "$destdir$logfilename" ]; then
-			rm "$destdir$logfilename"
-		fi
-		if [ -f "$destdir$m4bfilename" ]; then
-			rm "$destdir$m4bfilename"
-			rmdir "$destdir"
-		fi
+	# Default to 64 kbps if still unavailable
+	if [ -z "$bitrate" ] || [ "$bitrate" = "N/A" ]; then
+		bitrate=64000
 	fi
+
+	echo "$bitrate"
+}
+
+# Merge all audio files in source_dir into a single M4B with chapter markers
+# derived from filenames. On failure prints the ffmpeg error to stdout and
+# returns 1 so the caller can capture it as an error message.
+merge_to_m4b() {
+	local source_dir="$1"
+	local output_file="$2"
+	local bitrate="$3"
+
+	local tmpdir
+	tmpdir=$(mktemp -d)
+	local filelist="$tmpdir/files.txt"
+	local metafile="$tmpdir/metadata.txt"
+
+	printf ';FFMETADATA1\n' >"$metafile"
+
+	local chapter_start=0
+	local file_count=0
+
+	while IFS= read -r -d $'\0' f; do
+		local dur_ms
+		dur_ms=$(ffprobe -v quiet \
+			-show_entries format=duration \
+			-of default=noprint_wrappers=1:nokey=1 \
+			-i "$f" 2>/dev/null |
+			awk '{printf "%d", int($1 * 1000 + 0.5)}')
+
+		if [ -z "$dur_ms" ] || ! [ "$dur_ms" -gt 0 ] 2>/dev/null; then
+			echo "  Warning: could not get duration for $f, skipping"
+			continue
+		fi
+
+		local chapter_end=$((chapter_start + dur_ms))
+		local title
+		title=$(basename "${f%.*}")
+
+		printf '[CHAPTER]\nTIMEBASE=1/1000\nSTART=%d\nEND=%d\ntitle=%s\n\n' \
+			"$chapter_start" "$chapter_end" "$title" >>"$metafile"
+
+		printf "file '%s'\n" "$f" >>"$filelist"
+
+		chapter_start=$chapter_end
+		file_count=$((file_count + 1))
+	done < <(find "$source_dir" -maxdepth 1 -mindepth 1 -type f \
+		\( -name '*.mp3' -o -name '*.m4b' -o -name '*.mp4' -o -name '*.m4a' \
+		-o -name '*.ogg' -o -name '*.aac' -o -name '*.wma' \) \
+		-print0 | sort -z)
+
+	if [ "$file_count" -eq 0 ]; then
+		rm -rf "$tmpdir"
+		printf 'No audio files found in %s\n' "$source_dir"
+		return 1
+	fi
+
+	local ffmpeg_output
+	ffmpeg_output=$(ffmpeg -y -hide_banner \
+		-f concat -safe 0 -i "$filelist" \
+		-i "$metafile" \
+		-map 0:a \
+		-map_metadata 1 \
+		-map_chapters 1 \
+		-c:a libfdk_aac \
+		-b:a "$bitrate" \
+		-vn \
+		-threads "$CPUcores" \
+		-f mp4 \
+		"$output_file" 2>&1)
+	local result=$?
+
+	rm -rf "$tmpdir"
+
+	if [ $result -ne 0 ]; then
+		printf '%s\n' "$ffmpeg_output"
+		return 1
+	fi
+	return 0
 }
 
 while [ $keep_running == 1 ]; do
@@ -134,9 +192,7 @@ while [ $keep_running == 1 ]; do
 					cmdresult=$?
 				else
 					# Separate non m4b file in root, convert to m4b
-
 					m4bfilename="$filename_excl_ext$m4bext"
-					logfilename="$filename_excl_ext$logext"
 
 					action="MERGE"
 					echo "  Converting single media file '$full_source_path' to '$destdir$m4bfilename'"
@@ -148,12 +204,27 @@ while [ $keep_running == 1 ]; do
 						mkdir -p "$destdir"
 
 						echo "  Sampling bitrate of $full_source_path"
-						bitrate=$(ffprobe -hide_banner -loglevel 0 -of flat -i "$full_source_path" -select_streams a -show_entries format=bit_rate -of default=noprint_wrappers=1:nokey=1)
+						bitrate=$(get_audio_bitrate "$full_source_path")
 						echo "  Detected bitrate of $bitrate"
 
-						output=$(m4b-tool merge "$full_source_path" -n --audio-codec=libfdk_aac --audio-bitrate="$bitrate" --skip-cover --use-filenames-as-chapters --jobs="$CPUcores" --output-file="$destdir$m4bfilename" --logfile="$destdir$logfilename" --process-timeout=600 2>&1)
+						ffmpeg_output=$(ffmpeg -y -hide_banner \
+							-i "$full_source_path" \
+							-c:a libfdk_aac \
+							-b:a "$bitrate" \
+							-vn \
+							-threads "$CPUcores" \
+							-f mp4 \
+							"$destdir$m4bfilename" 2>&1)
+						cmdresult=$?
 
-						handle_m4btool_output
+						if [ $cmdresult -ne 0 ]; then
+							logerror="$ffmpeg_output"
+							rm -f "$destdir$m4bfilename"
+							rmdir "$destdir" 2>/dev/null
+						else
+							echo "  Setting permissions"
+							chmod -R a=,a+rwX "$destdir"
+						fi
 					fi
 				fi
 			else
@@ -174,7 +245,6 @@ while [ $keep_running == 1 ]; do
 
 					filename_excl_ext=$dir_item
 					m4bfilename="$filename_excl_ext$m4bext"
-					logfilename="$filename_excl_ext$logext"
 
 					echo "  Merging $dir_item to $destdir$m4bfilename"
 
@@ -187,16 +257,22 @@ while [ $keep_running == 1 ]; do
 						samplefile=$(find "$dir_item" -maxdepth 1 -mindepth 1 -type f \( -name '*.mp3' -o -name '*.m4b' -o -name '*.mp4' -o -name '*.m4a' -o -name '*.ogg' -o -name '*.aac' -o -name '*.wma' \) | head -n 1)
 
 						if [ -z "$samplefile" ]; then
-							bitrate=""
+							bitrate=64000
 						else
 							echo "  Sampling bitrate of $samplefile"
-							bitrate=$(ffprobe -hide_banner -loglevel 0 -of flat -i "$mp3mergedir$samplefile" -select_streams a -show_entries format=bit_rate -of default=noprint_wrappers=1:nokey=1)
+							bitrate=$(get_audio_bitrate "$mp3mergedir$samplefile")
 							echo "  Detected bitrate of $bitrate"
 						fi
 
-						output=$(m4b-tool merge "$full_source_path" -n --audio-codec=libfdk_aac --audio-bitrate="$bitrate" --skip-cover --use-filenames-as-chapters --jobs="$CPUcores" --output-file="$destdir$m4bfilename" --logfile="$destdir$logfilename" --process-timeout=600 2>&1)
-
-						handle_m4btool_output
+						if logerror=$(merge_to_m4b "$full_source_path" "$destdir$m4bfilename" "$bitrate"); then
+							cmdresult=0
+							echo "  Setting permissions"
+							chmod -R a=,a+rwX "$destdir"
+						else
+							cmdresult=1
+							rm -f "$destdir$m4bfilename"
+							rmdir "$destdir" 2>/dev/null
+						fi
 					fi
 				fi
 
