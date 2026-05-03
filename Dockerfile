@@ -63,11 +63,17 @@ ARG FFMPEG_VERSION=7.1.3
 ARG FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2"
 ARG FFMPEG_SHA256=e7df715136a1231598dadb70fe6abd5cd66abc1ac2f470a02c567b2600c5292b
 # sed changes --toolchain=hardened -pie to -static-pie
-RUN echo "---- FFMPEG BUILD ----" && \
-    curl -fsSL --retry 3 -o /tmp/ffmpeg.tar.bz2 "$FFMPEG_URL" && \
-    echo "$FFMPEG_SHA256  /tmp/ffmpeg.tar.bz2" | sha256sum --status -c - && \
-    tar xf /tmp/ffmpeg.tar.bz2 -C /tmp && \
-    cd /tmp/ffmpeg-* && \
+RUN echo "---- FFMPEG: download ----" && \
+    curl -fSL --retry 3 --retry-delay 2 -o /tmp/ffmpeg.tar.bz2 "$FFMPEG_URL"
+
+RUN echo "---- FFMPEG: verify sha256 ----" && \
+    echo "$FFMPEG_SHA256  /tmp/ffmpeg.tar.bz2" | sha256sum -c -
+
+RUN echo "---- FFMPEG: extract ----" && \
+    tar xf /tmp/ffmpeg.tar.bz2 -C /tmp
+
+RUN echo "---- FFMPEG: configure ----" && \
+    cd /tmp/ffmpeg-${FFMPEG_VERSION} && \
     sed -i 's/add_ldexeflags -fPIE -pie/add_ldexeflags -fPIE -static-pie/' configure && \
     ./configure \
     --pkg-config-flags="--static" \
@@ -82,8 +88,11 @@ RUN echo "---- FFMPEG BUILD ----" && \
     --enable-nonfree \
     --enable-libfdk-aac \
     --enable-openssl \
-    || (cat ffbuild/config.log ; false) \
-    && make -j$(nproc) install
+    || (cat ffbuild/config.log ; false)
+
+RUN echo "---- FFMPEG: make install ----" && \
+    cd /tmp/ffmpeg-${FFMPEG_VERSION} && \
+    make -j$(nproc) install
 
 ## Actual image
 FROM docker.io/library/alpine:3.23
