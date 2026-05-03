@@ -1,14 +1,5 @@
 FROM docker.io/library/alpine:3.23 AS builder
 
-# -O3 makes sure we compile with optimization. setting CFLAGS/CXXFLAGS seems to override
-# default automake cflags.
-# -static-libgcc is needed to make gcc not include gcc_s as "as-needed" shared library which
-# cmake will include as a implicit library.
-# other options to get hardened build (same as ffmpeg hardened)
-ARG CFLAGS="-O3 -s -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC -std=gnu17"
-ARG CXXFLAGS="-O3 -s -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC -std=gnu++17"
-ARG LDFLAGS="-Wl,-z,relro,-z,now"
-
 # retry dns and some http codes that might be transient errors
 ARG WGET_OPTS="--retry-on-host-error --retry-on-http-error=429,500,502,503"
 
@@ -18,6 +9,8 @@ RUN echo "---- INSTALL BUILD DEPENDENCIES ----" && \
     automake \
     libtool \
     build-base \
+    ca-certificates \
+    pkgconf \
     wget \
     nasm \
     yasm \
@@ -33,11 +26,24 @@ ARG FDK_AAC_VERSION=2.0.3
 ARG FDK_AAC_URL="https://github.com/mstorsjo/fdk-aac/archive/v$FDK_AAC_VERSION.tar.gz"
 ARG FDK_AAC_SHA256=e25671cd96b10bad896aa42ab91a695a9e573395262baed4e4a2ff178d6a3a78
 RUN echo "---- COMPILE FDK-AAC ----" && \
+    cd /tmp && \
     wget $WGET_OPTS -O fdk-aac.tar.gz "$FDK_AAC_URL" && \
     echo "$FDK_AAC_SHA256  fdk-aac.tar.gz" | sha256sum --status -c - && \
-    tar xfz fdk-aac.tar.gz && \
+    tar xf fdk-aac.tar.gz && \
     cd fdk-aac-* && ./autogen.sh && ./configure --enable-static --disable-shared && \
-    make -j$(nproc) install
+    make -j$(nproc) install && \
+    rm -rf /tmp/fdk-aac*
+
+# CFLAGS/CXXFLAGS/LDFLAGS are declared here so they apply only to the FFmpeg build
+# and do not interfere with fdk-aac's configure/make above.
+# -O3 makes sure we compile with optimization. setting CFLAGS/CXXFLAGS seems to override
+# default automake cflags.
+# -static-libgcc is needed to make gcc not include gcc_s as "as-needed" shared library which
+# cmake will include as a implicit library.
+# other options to get hardened build (same as ffmpeg hardened)
+ARG CFLAGS="-O3 -s -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC -std=gnu17"
+ARG CXXFLAGS="-O3 -s -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC -std=gnu++17"
+ARG LDFLAGS="-Wl,-z,relro,-z,now"
 
 # bump: ffmpeg /FFMPEG_VERSION=([\d.]+)/ https://github.com/FFmpeg/FFmpeg.git|^7
 # bump: ffmpeg after ./hashupdate Dockerfile FFMPEG $LATEST
