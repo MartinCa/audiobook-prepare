@@ -1,4 +1,4 @@
-FROM docker.io/library/alpine:3.19 AS builder
+FROM docker.io/library/alpine:3.23 AS builder
 
 # retry dns and some http codes that might be transient errors
 ARG WGET_OPTS="--retry-on-host-error --retry-on-http-error=429,500,502,503"
@@ -25,12 +25,23 @@ RUN echo "---- INSTALL BUILD DEPENDENCIES ----" && \
 ARG FDK_AAC_VERSION=2.0.3
 ARG FDK_AAC_URL="https://github.com/mstorsjo/fdk-aac/archive/v$FDK_AAC_VERSION.tar.gz"
 ARG FDK_AAC_SHA256=e25671cd96b10bad896aa42ab91a695a9e573395262baed4e4a2ff178d6a3a78
-RUN echo "---- COMPILE FDK-AAC ----" && \
+RUN echo "---- FDK-AAC: download ----" && \
     cd /tmp && \
     wget $WGET_OPTS -O fdk-aac.tar.gz "$FDK_AAC_URL" && \
-    echo "$FDK_AAC_SHA256  fdk-aac.tar.gz" | sha256sum --status -c - && \
-    tar xf fdk-aac.tar.gz && \
-    cd fdk-aac-* && ./autogen.sh && ./configure --enable-static --disable-shared && \
+    echo "$FDK_AAC_SHA256  fdk-aac.tar.gz" | sha256sum --status -c -
+
+RUN echo "---- FDK-AAC: extract ----" && \
+    tar xf /tmp/fdk-aac.tar.gz -C /tmp
+
+RUN echo "---- FDK-AAC: autogen ----" && \
+    cd /tmp/fdk-aac-${FDK_AAC_VERSION} && ./autogen.sh
+
+RUN echo "---- FDK-AAC: configure ----" && \
+    cd /tmp/fdk-aac-${FDK_AAC_VERSION} && \
+    ./configure --enable-static --disable-shared
+
+RUN echo "---- FDK-AAC: make install ----" && \
+    cd /tmp/fdk-aac-${FDK_AAC_VERSION} && \
     make -j$(nproc) install && \
     rm -rf /tmp/fdk-aac*
 
