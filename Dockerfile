@@ -233,15 +233,15 @@ RUN echo "---- ogg ----" && \
 # bump: theora link "Release notes" https://github.com/xiph/theora/releases/tag/v$LATEST
 # bump: theora link "Source diff $CURRENT..$LATEST" https://github.com/xiph/theora/compare/v$CURRENT..v$LATEST
 ARG THEORA_VERSION=1.1.1
-ARG THEORA_URL="https://downloads.xiph.org/releases/theora/libtheora-$THEORA_VERSION.tar.bz2"
-ARG THEORA_SHA256=b6ae1ee2fa3d42ac489287d3ec34c5885730b1296f0801ae577a35193d3affbc
+ARG THEORA_URL="https://github.com/xiph/theora/archive/v$THEORA_VERSION.tar.gz"
+ARG THEORA_SHA256=1d5c3b25bbced448f3e741c42df6796e3d5e57136a74bcd68262318290ec2982
 RUN echo "---- theora ----" && \
-    wget $WGET_OPTS -O libtheora.tar.bz2 "$THEORA_URL" && \
-    echo "$THEORA_SHA256  libtheora.tar.bz2" | sha256sum --status -c - && \
-    tar xf libtheora.tar.bz2 && \
+    wget $WGET_OPTS -O libtheora.tar.gz "$THEORA_URL" && \
+    echo "$THEORA_SHA256  libtheora.tar.gz" | sha256sum --status -c - && \
+    tar xf libtheora.tar.gz && \
     # --build=$(arch)-unknown-linux-gnu helps with guessing the correct build. For some reason,
     # build script can't guess the build type in arm64 (hardware and emulated) environment.
-    cd libtheora-* && ./configure --build=$(arch)-unknown-linux-gnu --disable-examples --disable-oggtest --disable-shared --enable-static && \
+    cd theora-* && ./configure --build=$(arch)-unknown-linux-gnu --disable-examples --disable-oggtest --disable-shared --enable-static && \
     make -j$(nproc) install
 
 
@@ -288,7 +288,7 @@ RUN echo "---- vorbis ----" && \
 #  make -j$(nproc) install
 
 
-# bump: libwebp /LIBWEBP_VERSION=([\d.]+)/ https://github.com/webmproject/libwebp.git|*
+# bump: libwebp /LIBWEBP_VERSION=([\d.]+)/ https://github.com/webmproject/libwebp.git|/^\d+\.\d+\.\d+$/
 # bump: libwebp after ./hashupdate Dockerfile LIBWEBP $LATEST
 # bump: libwebp link "Release notes" https://github.com/webmproject/libwebp/releases/tag/v$LATEST
 # bump: libwebp link "Source diff $CURRENT..$LATEST" https://github.com/webmproject/libwebp/compare/v$CURRENT..v$LATEST
