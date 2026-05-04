@@ -6,8 +6,6 @@ faileddir="/failed/"
 ebookfilesdir="/ebookfiles/"
 logfile="/config/processing.log"
 m4bext=".m4b"
-internaluntaggeddir="/untagged/"
-
 cd "$mp3mergedir"
 
 touch -a "$logfile"
@@ -25,7 +23,7 @@ else
 	CPUcores="$CPU_CORES"
 fi
 
-if [ $MONITOR_DIR != 1 ]; then
+if [ "$MONITOR_DIR" != 1 ]; then
 	echo "Only doing single run"
 else
 	echo "Continously running monitoring directory"
@@ -55,8 +53,6 @@ is_media_file() {
 		return 1
 		;;
 	esac
-
-	return 1
 }
 
 get_audio_bitrate() {
@@ -136,7 +132,8 @@ merge_to_m4b() {
 
 	if [ "$file_count" -eq 0 ]; then
 		rm -rf "$tmpdir"
-		printf 'No audio files found in %s\n' "$source_dir"
+		MERGE_ERROR="No audio files found in $source_dir"
+		printf '%s\n' "$MERGE_ERROR"
 		return 1
 	fi
 
@@ -167,14 +164,14 @@ merge_to_m4b() {
 	return 0
 }
 
-while [ $keep_running == 1 ]; do
+while [ "$keep_running" -eq 1 ]; do
 	dir_content=*
 
 	for dir_item in $dir_content; do
 		is_media_file "$dir_item"
 		dir_item_is_mediafile=$?
 
-		if [ -d "$dir_item" ] || [ $dir_item_is_mediafile == 0 ]; then
+		if [ -d "$dir_item" ] || [ "$dir_item_is_mediafile" -eq 0 ]; then
 			cmdresult=1
 			action="NONE"
 			logerror=""
@@ -183,7 +180,7 @@ while [ $keep_running == 1 ]; do
 			full_source_path="$mp3mergedir$dir_item"
 			destdir="$untaggeddir$dir_item/"
 
-			if [ $dir_item_is_mediafile == 0 ]; then
+			if [ "$dir_item_is_mediafile" -eq 0 ]; then
 				filename_excl_ext=${dir_item::-4}
 				destdir="$untaggeddir$filename_excl_ext/"
 
@@ -222,7 +219,7 @@ while [ $keep_running == 1 ]; do
 							"$destdir$m4bfilename" 2>&1 | tee "$tmplog"
 						cmdresult=${PIPESTATUS[0]}
 
-						if [ $cmdresult -ne 0 ]; then
+						if [ "$cmdresult" -ne 0 ]; then
 							logerror=$(cat "$tmplog")
 							rm -f "$destdir$m4bfilename"
 							rmdir "$destdir" 2>/dev/null
@@ -237,7 +234,7 @@ while [ $keep_running == 1 ]; do
 				# Directory
 				numberofm4bfiles=$(find "$dir_item" -type f -name '*.m4b' | wc -l)
 
-				if [[ $numberofm4bfiles == 1 ]]; then
+				if [[ $numberofm4bfiles -eq 1 ]]; then
 					# Only 1 m4b file so we copy dir straight to untagged for tagging
 					action="COPY"
 					echo "  Copying single m4b file in '$full_source_path' to '$destdir'"
@@ -294,14 +291,15 @@ while [ $keep_running == 1 ]; do
 
 			fi
 
-			if [ $cmdresult == 0 ]; then
+			if [ "$cmdresult" -eq 0 ]; then
 				echo "  Processing succeeded"
 				rm -rf "$full_source_path"
 				echo "$(date -I'seconds') SUCCESS $action $dir_item" >>"$logfile"
 			else
 				echo "  ERROR: Processing failed: $logerror"
 				cp -r "$full_source_path" "$faileddir" && rm -rf "$full_source_path"
-				echo "$(date -I'seconds') FAILED $action $dir_item: $logerror" >>"$logfile"
+				log_error=$(printf '%s' "$logerror" | tail -5 | tr '\n' '|')
+				echo "$(date -I'seconds') FAILED $action $dir_item: $log_error" >>"$logfile"
 			fi
 		else
 			echo "Ignored $dir_item"
@@ -309,7 +307,7 @@ while [ $keep_running == 1 ]; do
 		echo ""
 	done
 
-	if [ $MONITOR_DIR != 1 ]; then
+	if [ "$MONITOR_DIR" != 1 ]; then
 		keep_running=0
 	else
 		echo "Done for now, sleeping for $sleeptime"
