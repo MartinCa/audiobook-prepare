@@ -86,9 +86,10 @@ get_audio_bitrate() {
 	echo "$bitrate"
 }
 
+MERGE_ERROR=""
+
 # Merge all audio files in source_dir into a single M4B with chapter markers
-# derived from filenames. On failure prints the ffmpeg error to stdout and
-# returns 1 so the caller can capture it as an error message.
+# derived from filenames. Sets MERGE_ERROR and returns 1 on failure.
 merge_to_m4b() {
 	local source_dir="$1"
 	local output_file="$2"
@@ -139,8 +140,9 @@ merge_to_m4b() {
 		return 1
 	fi
 
-	local ffmpeg_output
-	ffmpeg_output=$(ffmpeg -y -hide_banner \
+	local tmplog
+	tmplog=$(mktemp)
+	ffmpeg -y -hide_banner \
 		-f concat -safe 0 -i "$filelist" \
 		-i "$metafile" \
 		-map 0:a \
@@ -151,15 +153,17 @@ merge_to_m4b() {
 		-vn \
 		-threads "$CPUcores" \
 		-f mp4 \
-		"$output_file" 2>&1)
-	local result=$?
+		"$output_file" 2>&1 | tee "$tmplog"
+	local result=${PIPESTATUS[0]}
 
 	rm -rf "$tmpdir"
 
 	if [ $result -ne 0 ]; then
-		printf '%s\n' "$ffmpeg_output"
+		MERGE_ERROR=$(cat "$tmplog")
+		rm -f "$tmplog"
 		return 1
 	fi
+	rm -f "$tmplog"
 	return 0
 }
 
@@ -207,24 +211,26 @@ while [ $keep_running == 1 ]; do
 						bitrate=$(get_audio_bitrate "$full_source_path")
 						echo "  Detected bitrate of $bitrate"
 
-						ffmpeg_output=$(ffmpeg -y -hide_banner \
+						tmplog=$(mktemp)
+						ffmpeg -y -hide_banner \
 							-i "$full_source_path" \
 							-c:a libfdk_aac \
 							-b:a "$bitrate" \
 							-vn \
 							-threads "$CPUcores" \
 							-f mp4 \
-							"$destdir$m4bfilename" 2>&1)
-						cmdresult=$?
+							"$destdir$m4bfilename" 2>&1 | tee "$tmplog"
+						cmdresult=${PIPESTATUS[0]}
 
 						if [ $cmdresult -ne 0 ]; then
-							logerror="$ffmpeg_output"
+							logerror=$(cat "$tmplog")
 							rm -f "$destdir$m4bfilename"
 							rmdir "$destdir" 2>/dev/null
 						else
 							echo "  Setting permissions"
 							chmod -R a=,a+rwX "$destdir"
 						fi
+						rm -f "$tmplog"
 					fi
 				fi
 			else
@@ -264,12 +270,13 @@ while [ $keep_running == 1 ]; do
 							echo "  Detected bitrate of $bitrate"
 						fi
 
-						if logerror=$(merge_to_m4b "$full_source_path" "$destdir$m4bfilename" "$bitrate"); then
+						if merge_to_m4b "$full_source_path" "$destdir$m4bfilename" "$bitrate"; then
 							cmdresult=0
 							echo "  Setting permissions"
 							chmod -R a=,a+rwX "$destdir"
 						else
 							cmdresult=1
+							logerror="$MERGE_ERROR"
 							rm -f "$destdir$m4bfilename"
 							rmdir "$destdir" 2>/dev/null
 						fi
