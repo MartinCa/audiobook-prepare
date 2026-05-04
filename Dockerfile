@@ -1,12 +1,19 @@
-FROM docker.io/sandreas/tone:v0.2.5 AS tone
 FROM docker.io/library/alpine:3.23 AS builder
 
-# bump: mp4v2 /MP4V2_VERSION=([\d.]+)/ https://github.com/enzo1982/mp4v2.git|*
-# bump: mp4v2 after ./hashupdate Dockerfile MP4V2 $LATEST
-# bump: mp4v2 link "Release notes" https://github.com/enzo1982/mp4v2/releases/tag/v$LATEST
-ARG MP4V2_VERSION=2.1.3
-ARG MP4V2_URL="https://github.com/enzo1982/mp4v2/archive/refs/tags/v$MP4V2_VERSION.zip"
-ARG MP4V2_SHA256=9c02b94db3b3f07ef961ec2220ff616ae283616b263d00f944f9f56c5d0a45e1
+RUN echo "---- INSTALL BUILD DEPENDENCIES ----" && \
+    apk add --no-cache \
+    autoconf \
+    automake \
+    libtool \
+    build-base \
+    ca-certificates \
+    curl \
+    pkgconf \
+    nasm \
+    yasm \
+    bzip2 \
+    openssl-dev openssl-libs-static \
+    zlib-dev zlib-static
 
 # bump: fdk-aac /FDK_AAC_VERSION=([\d.]+)/ https://github.com/mstorsjo/fdk-aac.git|*
 # bump: fdk-aac after ./hashupdate Dockerfile FDK_AAC $LATEST
@@ -15,58 +22,17 @@ ARG MP4V2_SHA256=9c02b94db3b3f07ef961ec2220ff616ae283616b263d00f944f9f56c5d0a45e
 ARG FDK_AAC_VERSION=2.0.3
 ARG FDK_AAC_URL="https://github.com/mstorsjo/fdk-aac/archive/v$FDK_AAC_VERSION.tar.gz"
 ARG FDK_AAC_SHA256=e25671cd96b10bad896aa42ab91a695a9e573395262baed4e4a2ff178d6a3a78
+RUN echo "---- COMPILE FDK-AAC ----" && \
+    curl -fSL --retry 3 --retry-delay 2 -o /tmp/fdk-aac.tar.gz "$FDK_AAC_URL" && \
+    echo "$FDK_AAC_SHA256  /tmp/fdk-aac.tar.gz" | sha256sum -c - && \
+    tar xf /tmp/fdk-aac.tar.gz -C /tmp && \
+    cd /tmp/fdk-aac-${FDK_AAC_VERSION} && ./autogen.sh && \
+    ./configure --enable-static --disable-shared && \
+    make -j$(nproc) install && \
+    rm -rf /tmp/fdk-aac*
 
-# bump: fdkaac /FDKAAC_VERSION=([\d.]+)/ https://github.com/nu774/fdkaac.git|*
-# bump: fdkaac after ./hashupdate Dockerfile FDKAAC $LATEST
-# bump: fdkaac link "Release notes" https://github.com/nu774/fdkaac/releases/tag/v$LATEST
-ARG FDKAAC_VERSION=1.0.6
-ARG FDKAAC_URL="https://github.com/nu774/fdkaac/archive/v$FDKAAC_VERSION.tar.gz"
-ARG FDKAAC_SHA256=ed34c8dcae3d49d385e1ceaa380c5871cda744402358c61bcb49950a25bfae58
-
-# Reference: https://github.com/sandreas/dockerhub-builds
-
-RUN echo "---- INSTALL BUILD DEPENDENCIES ----" \
-    && apk add --no-cache --update --upgrade --virtual=build-dependencies \
-    autoconf \
-    libtool \
-    automake \
-    boost-dev \
-    build-base \
-    coreutils \
-    gcc \
-    git \
-    tar \
-    wget
-
-RUN echo "---- COMPILE MP4V2 ----" \
-    && cd /tmp/ \
-    && wget "${MP4V2_URL}" -O mp4v2.zip \
-    && echo "$MP4V2_SHA256  mp4v2.zip" | sha256sum --status -c - \
-    && unzip mp4v2.zip \
-    && cd mp4v2* \
-    && autoreconf -fiv \
-    && ./configure && \
-    make -j$(nproc) && \
-    make install && make distclean
-
-RUN echo "---- PREPARE FDKAAC-DEPENDENCIES ----" \
-    && cd /tmp/ \
-    && wget -O fdk-aac.tar.gz "$FDK_AAC_URL" \
-    && echo "$FDK_AAC_SHA256  fdk-aac.tar.gz" | sha256sum --status -c - \
-    && tar xfz fdk-aac.tar.gz \
-    && cd fdk-aac-* && ./autogen.sh && ./configure --enable-static --disable-shared && make -j$(nproc) install
-
-RUN echo "---- COMPILE FDKAAC ENCODER (executable binary for usage of --audio-profile) ----" \
-    && cd /tmp/ \
-    && wget -O fdkaac.tar.gz "$FDKAAC_URL" \
-    && echo "$FDKAAC_SHA256  fdkaac.tar.gz" | sha256sum --status -c - \
-    && tar xzf fdkaac.tar.gz \
-    && cd fdkaac-* \
-    && autoreconf -i && ./configure --enable-static --disable-shared && make -j$(nproc) && make install && rm -rf /tmp/*
-
-## START FFMPEG BUILD
-# Reference: https://github.com/wader/static-ffmpeg
-
+# CFLAGS/CXXFLAGS/LDFLAGS are declared here so they apply only to the FFmpeg build
+# and do not interfere with fdk-aac's configure/make above.
 # -O3 makes sure we compile with optimization. setting CFLAGS/CXXFLAGS seems to override
 # default automake cflags.
 # -static-libgcc is needed to make gcc not include gcc_s as "as-needed" shared library which
@@ -76,232 +42,6 @@ ARG CFLAGS="-O3 -s -static-libgcc -fno-strict-overflow -fstack-protector-all -fP
 ARG CXXFLAGS="-O3 -s -static-libgcc -fno-strict-overflow -fstack-protector-all -fPIC -std=gnu++17"
 ARG LDFLAGS="-Wl,-z,relro,-z,now"
 
-# retry dns and some http codes that might be transient errors
-ARG WGET_OPTS="--retry-on-host-error --retry-on-http-error=429,500,502,503"
-
-RUN echo "---- INSTALL FFMPEG BUILD DEPENDENCIES ----" && \
-    apk add --no-cache \
-    rust cargo \
-    openssl-dev openssl-libs-static \
-    ca-certificates \
-    bash \
-    diffutils \
-    cmake meson ninja \
-    yasm nasm \
-    texinfo \
-    jq \
-    zlib-dev zlib-static \
-    bzip2-dev bzip2-static \
-    libxml2-dev libxml2-static \
-    xz-dev xz-static \
-    expat-dev expat-static \
-    fontconfig-dev fontconfig-static \
-    freetype freetype-dev freetype-static \
-    graphite2-static \
-    glib-static \
-    tiff tiff-dev \
-    libjpeg-turbo libjpeg-turbo-dev \
-    libpng-dev libpng-static \
-    giflib giflib-dev \
-    harfbuzz-dev harfbuzz-static \
-    fribidi-dev fribidi-static \
-    brotli-dev brotli-static \
-    soxr-dev soxr-static \
-    tcl \
-    numactl-dev \
-    cunit cunit-dev \
-    fftw-dev \
-    libsamplerate-dev \
-    xxd
-
-# Removed because fdk-aac is build above
-# RUN \
-#   wget $WGET_OPTS -O fdk-aac.tar.gz "$FDK_AAC_URL" && \
-#   echo "$FDK_AAC_SHA256  fdk-aac.tar.gz" | sha256sum --status -c - && \
-#   tar xf fdk-aac.tar.gz && \
-#   cd fdk-aac-* && ./autogen.sh && ./configure --disable-shared --enable-static && \
-#   make -j$(nproc) install
-
-# bump: mp3lame /MP3LAME_VERSION=([\d.]+)/ svn:http://svn.code.sf.net/p/lame/svn|/^RELEASE__(.*)$/|/_/./|*
-# bump: mp3lame after ./hashupdate Dockerfile MP3LAME $LATEST
-# bump: mp3lame link "ChangeLog" http://svn.code.sf.net/p/lame/svn/trunk/lame/ChangeLog
-ARG MP3LAME_VERSION=3.100
-ARG MP3LAME_URL="https://sourceforge.net/projects/lame/files/lame/$MP3LAME_VERSION/lame-$MP3LAME_VERSION.tar.gz/download"
-ARG MP3LAME_SHA256=ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e
-RUN echo "---- MP3LAME ----" && \
-    wget $WGET_OPTS -O lame.tar.gz "$MP3LAME_URL" && \
-    echo "$MP3LAME_SHA256  lame.tar.gz" | sha256sum --status -c - && \
-    tar xf lame.tar.gz && \
-    cd lame-* && ./configure --disable-shared --enable-static --enable-nasm --disable-gtktest --disable-cpml --disable-frontend && \
-    make -j$(nproc) install
-
-# bump: opencoreamr /OPENCOREAMR_VERSION=([\d.]+)/ fetch:https://sourceforge.net/projects/opencore-amr/files/opencore-amr/|/opencore-amr-([\d.]+).tar.gz/
-# bump: opencoreamr after ./hashupdate Dockerfile OPENCOREAMR $LATEST
-# bump: opencoreamr link "ChangeLog" https://sourceforge.net/p/opencore-amr/code/ci/master/tree/ChangeLog
-ARG OPENCOREAMR_VERSION=0.1.6
-ARG OPENCOREAMR_URL="https://sourceforge.net/projects/opencore-amr/files/opencore-amr/opencore-amr-$OPENCOREAMR_VERSION.tar.gz"
-ARG OPENCOREAMR_SHA256=483eb4061088e2b34b358e47540b5d495a96cd468e361050fae615b1809dc4a1
-RUN echo "---- opencore ----" && \
-    wget $WGET_OPTS -O opencoreamr.tar.gz "$OPENCOREAMR_URL" && \
-    echo "$OPENCOREAMR_SHA256  opencoreamr.tar.gz" | sha256sum --status -c - && \
-    tar xf opencoreamr.tar.gz && \
-    cd opencore-amr-* && ./configure --enable-static --disable-shared && \
-    make -j$(nproc) install
-
-# bump: openjpeg /OPENJPEG_VERSION=([\d.]+)/ https://github.com/uclouvain/openjpeg.git|*
-# bump: openjpeg after ./hashupdate Dockerfile OPENJPEG $LATEST
-# bump: openjpeg link "CHANGELOG" https://github.com/uclouvain/openjpeg/blob/master/CHANGELOG.md
-ARG OPENJPEG_VERSION=2.5.4
-ARG OPENJPEG_URL="https://github.com/uclouvain/openjpeg/archive/v$OPENJPEG_VERSION.tar.gz"
-ARG OPENJPEG_SHA256=a695fbe19c0165f295a8531b1e4e855cd94d0875d2f88ec4b61080677e27188a
-RUN echo "---- openjpeg ----" && \
-    wget $WGET_OPTS -O openjpeg.tar.gz "$OPENJPEG_URL" && \
-    echo "$OPENJPEG_SHA256  openjpeg.tar.gz" | sha256sum --status -c - && \
-    tar xf openjpeg.tar.gz && \
-    cd openjpeg-* && mkdir build && cd build && \
-    cmake \
-    -G"Unix Makefiles" \
-    -DCMAKE_VERBOSE_MAKEFILE=ON \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_SHARED_LIBS=OFF \
-    -DBUILD_PKGCONFIG_FILES=ON \
-    -DBUILD_CODEC=OFF \
-    -DWITH_ASTYLE=OFF \
-    -DBUILD_TESTING=OFF \
-    .. && \
-    make -j$(nproc) install
-
-# bump: opus /OPUS_VERSION=([\d.]+)/ https://github.com/xiph/opus.git|^1
-# bump: opus after ./hashupdate Dockerfile OPUS $LATEST
-# bump: opus link "Release notes" https://github.com/xiph/opus/releases/tag/v$LATEST
-# bump: opus link "Source diff $CURRENT..$LATEST" https://github.com/xiph/opus/compare/v$CURRENT..v$LATEST
-ARG OPUS_VERSION=1.6.1
-ARG OPUS_URL="https://downloads.xiph.org/releases/opus/opus-$OPUS_VERSION.tar.gz"
-ARG OPUS_SHA256=6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1
-RUN echo "---- opus ----" && \
-    wget $WGET_OPTS -O opus.tar.gz "$OPUS_URL" && \
-    echo "$OPUS_SHA256  opus.tar.gz" | sha256sum --status -c - && \
-    tar xf opus.tar.gz && \
-    cd opus-* && ./configure --disable-shared --enable-static --disable-extra-programs --disable-doc && \
-    make -j$(nproc) install
-
-# bump: LIBSHINE /LIBSHINE_VERSION=([\d.]+)/ https://github.com/toots/shine.git|*
-# bump: LIBSHINE after ./hashupdate Dockerfile LIBSHINE $LATEST
-# bump: LIBSHINE link "CHANGELOG" https://github.com/toots/shine/blob/master/ChangeLog
-# bump: LIBSHINE link "Source diff $CURRENT..$LATEST" https://github.com/toots/shine/compare/$CURRENT..$LATEST
-ARG LIBSHINE_VERSION=3.1.1
-ARG LIBSHINE_URL="https://github.com/toots/shine/releases/download/$LIBSHINE_VERSION/shine-$LIBSHINE_VERSION.tar.gz"
-ARG LIBSHINE_SHA256=58e61e70128cf73f88635db495bfc17f0dde3ce9c9ac070d505a0cd75b93d384
-RUN echo "---- libshine ----" && \
-    wget $WGET_OPTS -O libshine.tar.gz "$LIBSHINE_URL" && \
-    echo "$LIBSHINE_SHA256  libshine.tar.gz" | sha256sum --status -c - && \
-    tar xf libshine.tar.gz && cd shine* && \
-    ./configure --with-pic --enable-static --disable-shared --disable-fast-install && \
-    make -j$(nproc) install
-
-# bump: speex /SPEEX_VERSION=([\d.]+)/ https://github.com/xiph/speex.git|*
-# bump: speex after ./hashupdate Dockerfile SPEEX $LATEST
-# bump: speex link "ChangeLog" https://github.com/xiph/speex//blob/master/ChangeLog
-# bump: speex link "Source diff $CURRENT..$LATEST" https://github.com/xiph/speex/compare/$CURRENT..$LATEST
-ARG SPEEX_VERSION=1.2.1
-ARG SPEEX_URL="https://github.com/xiph/speex/archive/Speex-$SPEEX_VERSION.tar.gz"
-ARG SPEEX_SHA256=beaf2642e81a822eaade4d9ebf92e1678f301abfc74a29159c4e721ee70fdce0
-RUN echo "---- speex ----" && \
-    wget $WGET_OPTS -O speex.tar.gz "$SPEEX_URL" && \
-    echo "$SPEEX_SHA256  speex.tar.gz" | sha256sum --status -c - && \
-    tar xf speex.tar.gz && \
-    cd speex-Speex-* && ./autogen.sh && ./configure --disable-shared --enable-static && \
-    make -j$(nproc) install
-
-# has to be before theora
-# bump: ogg /OGG_VERSION=([\d.]+)/ https://github.com/xiph/ogg.git|*
-# bump: ogg after ./hashupdate Dockerfile OGG $LATEST
-# bump: ogg link "CHANGES" https://github.com/xiph/ogg/blob/master/CHANGES
-# bump: ogg link "Source diff $CURRENT..$LATEST" https://github.com/xiph/ogg/compare/v$CURRENT..v$LATEST
-ARG OGG_VERSION=1.3.6
-ARG OGG_URL="https://downloads.xiph.org/releases/ogg/libogg-$OGG_VERSION.tar.gz"
-ARG OGG_SHA256=83e6704730683d004d20e21b8f7f55dcb3383cdf84c0daedf30bde175f774638
-RUN echo "---- ogg ----" && \
-    wget $WGET_OPTS -O libogg.tar.gz "$OGG_URL" && \
-    echo "$OGG_SHA256  libogg.tar.gz" | sha256sum --status -c - && \
-    tar xf libogg.tar.gz && \
-    cd libogg-* && ./configure --disable-shared --enable-static && \
-    make -j$(nproc) install
-
-# bump: theora /THEORA_VERSION=([\d.]+)/ https://github.com/xiph/theora.git|*
-# bump: theora after ./hashupdate Dockerfile THEORA $LATEST
-# bump: theora link "Release notes" https://github.com/xiph/theora/releases/tag/v$LATEST
-# bump: theora link "Source diff $CURRENT..$LATEST" https://github.com/xiph/theora/compare/v$CURRENT..v$LATEST
-ARG THEORA_VERSION=1.2.0
-ARG THEORA_URL="https://github.com/xiph/theora/archive/v$THEORA_VERSION.tar.gz"
-ARG THEORA_SHA256=e0c35771b425c32a052ffb358a2aed14219340ab850b48dc85b01939c0513a31
-RUN echo "---- theora ----" && \
-    wget $WGET_OPTS -O libtheora.tar.gz "$THEORA_URL" && \
-    echo "$THEORA_SHA256  libtheora.tar.gz" | sha256sum --status -c - && \
-    tar xf libtheora.tar.gz && \
-    # --build=$(arch)-unknown-linux-gnu helps with guessing the correct build. For some reason,
-    # build script can't guess the build type in arm64 (hardware and emulated) environment.
-    cd theora-* && ./autogen.sh && ./configure --build=$(arch)-unknown-linux-gnu --disable-examples --disable-oggtest --disable-shared --enable-static && \
-    make -j$(nproc) install
-
-
-# bump: twolame /TWOLAME_VERSION=([\d.]+)/ https://github.com/njh/twolame.git|*
-# bump: twolame after ./hashupdate Dockerfile TWOLAME $LATEST
-# bump: twolame link "Source diff $CURRENT..$LATEST" https://github.com/njh/twolame/compare/v$CURRENT..v$LATEST
-ARG TWOLAME_VERSION=0.4.0
-ARG TWOLAME_URL="https://github.com/njh/twolame/releases/download/$TWOLAME_VERSION/twolame-$TWOLAME_VERSION.tar.gz"
-ARG TWOLAME_SHA256=cc35424f6019a88c6f52570b63e1baf50f62963a3eac52a03a800bb070d7c87d
-RUN echo "---- twolame ----" && \
-    wget $WGET_OPTS -O twolame.tar.gz "$TWOLAME_URL" && \
-    echo "$TWOLAME_SHA256  twolame.tar.gz" | sha256sum --status -c - && \
-    tar xf twolame.tar.gz && \
-    cd twolame-* && ./configure --disable-shared --enable-static --disable-sndfile --with-pic && \
-    make -j$(nproc) install
-
-# bump: vorbis /VORBIS_VERSION=([\d.]+)/ https://github.com/xiph/vorbis.git|*
-# bump: vorbis after ./hashupdate Dockerfile VORBIS $LATEST
-# bump: vorbis link "CHANGES" https://github.com/xiph/vorbis/blob/master/CHANGES
-# bump: vorbis link "Source diff $CURRENT..$LATEST" https://github.com/xiph/vorbis/compare/v$CURRENT..v$LATEST
-ARG VORBIS_VERSION=1.3.7
-ARG VORBIS_URL="https://downloads.xiph.org/releases/vorbis/libvorbis-$VORBIS_VERSION.tar.gz"
-ARG VORBIS_SHA256=0e982409a9c3fc82ee06e08205b1355e5c6aa4c36bca58146ef399621b0ce5ab
-RUN echo "---- vorbis ----" && \
-    wget $WGET_OPTS -O libvorbis.tar.gz "$VORBIS_URL" && \
-    echo "$VORBIS_SHA256  libvorbis.tar.gz" | sha256sum --status -c - && \
-    tar xf libvorbis.tar.gz && \
-    cd libvorbis-* && ./configure --disable-shared --enable-static --disable-oggtest && \
-    make -j$(nproc) install
-
-
-#bump: libvpx /VPX_VERSION=([\d.]+)/ https://github.com/webmproject/libvpx.git|*
-#bump: libvpx after ./hashupdate Dockerfile VPX $LATEST
-#bump: libvpx link "CHANGELOG" https://github.com/webmproject/libvpx/blob/master/CHANGELOG
-#bump: libvpx link "Source diff $CURRENT..$LATEST" https://github.com/webmproject/libvpx/compare/v$CURRENT..v$LATEST
-#ARG VPX_VERSION=1.16.0
-#ARG VPX_URL="https://github.com/webmproject/libvpx/archive/v$VPX_VERSION.tar.gz"
-#ARG VPX_SHA256=7a479a3c66b9f5d5542a4c6a1b7d3768a983b1e5c14c60a9396edc9b649e015c
-#RUN \
-#  wget $WGET_OPTS -O libvpx.tar.gz "$VPX_URL" && \
-#  echo "$VPX_SHA256  libvpx.tar.gz" | sha256sum --status -c - && \
-#  tar xf libvpx.tar.gz && \
-#  cd libvpx-* && ./configure --enable-static --enable-vp9-highbitdepth --disable-shared --disable-unit-tests --disable-examples && \
-#  make -j$(nproc) install
-
-
-# bump: libwebp /LIBWEBP_VERSION=([\d.]+)/ https://github.com/webmproject/libwebp.git|/^\d+\.\d+\.\d+$/
-# bump: libwebp after ./hashupdate Dockerfile LIBWEBP $LATEST
-# bump: libwebp link "Release notes" https://github.com/webmproject/libwebp/releases/tag/v$LATEST
-# bump: libwebp link "Source diff $CURRENT..$LATEST" https://github.com/webmproject/libwebp/compare/v$CURRENT..v$LATEST
-ARG LIBWEBP_VERSION=1.6.0
-ARG LIBWEBP_URL="https://github.com/webmproject/libwebp/archive/v$LIBWEBP_VERSION.tar.gz"
-ARG LIBWEBP_SHA256=93a852c2b3efafee3723efd4636de855b46f9fe1efddd607e1f42f60fc8f2136
-RUN echo "---- libwebp ----" && \
-    wget $WGET_OPTS -O libwebp.tar.gz "$LIBWEBP_URL" && \
-    echo "$LIBWEBP_SHA256  libwebp.tar.gz" | sha256sum --status -c - && \
-    tar xf libwebp.tar.gz && \
-    cd libwebp-* && ./autogen.sh && ./configure --disable-shared --enable-static --with-pic --enable-libwebpmux --disable-libwebpextras --disable-libwebpdemux --disable-sdl --disable-gl --disable-png --disable-jpeg --disable-tiff --disable-gif && \
-    make -j$(nproc) install
-
 # bump: ffmpeg /FFMPEG_VERSION=([\d.]+)/ https://github.com/FFmpeg/FFmpeg.git|^7
 # bump: ffmpeg after ./hashupdate Dockerfile FFMPEG $LATEST
 # bump: ffmpeg link "Changelog" https://github.com/FFmpeg/FFmpeg/blob/n$LATEST/Changelog
@@ -310,90 +50,28 @@ ARG FFMPEG_VERSION=7.1.3
 ARG FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2"
 ARG FFMPEG_SHA256=e7df715136a1231598dadb70fe6abd5cd66abc1ac2f470a02c567b2600c5292b
 # sed changes --toolchain=hardened -pie to -static-pie
-# extra ldflags stack-size=2097152 is to increase default stack size from 128KB (musl default) to something
-# more similar to glibc (2MB). This fixing segfault with libaom-av1 and libsvtav1 as they seems to pass
-# large things on the stack.
-RUN echo "---- FFMPEG BUILD ----" && \
-    wget $WGET_OPTS -O ffmpeg.tar.bz2 "$FFMPEG_URL" && \
-    echo "$FFMPEG_SHA256  ffmpeg.tar.bz2" | sha256sum --status -c - && \
-    tar xf ffmpeg.tar.bz2 && \
-    cd ffmpeg-* && \
+RUN echo "---- COMPILE FFMPEG ----" && \
+    curl -fSL --retry 3 --retry-delay 2 -o /tmp/ffmpeg.tar.bz2 "$FFMPEG_URL" && \
+    echo "$FFMPEG_SHA256  /tmp/ffmpeg.tar.bz2" | sha256sum -c - && \
+    tar xf /tmp/ffmpeg.tar.bz2 -C /tmp && \
+    cd /tmp/ffmpeg-${FFMPEG_VERSION} && \
     sed -i 's/add_ldexeflags -fPIE -pie/add_ldexeflags -fPIE -static-pie/' configure && \
     ./configure \
     --pkg-config-flags="--static" \
-    --extra-cflags="-fopenmp" \
-    --extra-ldflags="-fopenmp -Wl,-z,stack-size=2097152" \
     --toolchain=hardened \
     --disable-debug \
     --disable-shared \
     --disable-ffplay \
+    --disable-doc \
     --enable-static \
     --enable-gpl \
     --enable-version3 \
     --enable-nonfree \
-    --enable-fontconfig \
-    --enable-gray \
-    --enable-iconv \
     --enable-libfdk-aac \
-    --enable-libfreetype \
-    --enable-libfribidi \
-    --enable-libmp3lame \
-    --enable-libopencore-amrnb \
-    --enable-libopencore-amrwb \
-    --enable-libopenjpeg \
-    --enable-libopus \
-    --enable-libshine \
-    --enable-libsoxr \
-    --enable-libspeex \
-    --enable-libtheora \
-    --enable-libtwolame \
-    --enable-libvorbis \
-    --enable-libwebp \
-    --enable-libxml2 \
     --enable-openssl \
     || (cat ffbuild/config.log ; false) \
-    && make -j$(nproc) install
-
-RUN echo "---- output versions ----" && \
-    EXPAT_VERSION=$(pkg-config --modversion expat) \
-    FFTW_VERSION=$(pkg-config --modversion fftw3) \
-    FONTCONFIG_VERSION=$(pkg-config --modversion fontconfig)  \
-    FREETYPE_VERSION=$(pkg-config --modversion freetype2)  \
-    FRIBIDI_VERSION=$(pkg-config --modversion fribidi)  \
-    LIBSAMPLERATE_VERSION=$(pkg-config --modversion samplerate) \
-    LIBXML2_VERSION=$(pkg-config --modversion libxml-2.0) \
-    OPENSSL_VERSION=$(pkg-config --modversion openssl) \
-    SOXR_VERSION=$(pkg-config --modversion soxr) \
-    jq -n \
-    '{ \
-    expat: env.EXPAT_VERSION, \
-    "libfdk-aac": env.FDK_AAC_VERSION, \
-    ffmpeg: env.FFMPEG_VERSION, \
-    fftw: env.FFTW_VERSION, \
-    fontconfig: env.FONTCONFIG_VERSION, \
-    libfreetype: env.FREETYPE_VERSION, \
-    libfribidi: env.FRIBIDI_VERSION, \
-    libmp3lame: env.MP3LAME_VERSION, \
-    libogg: env.LIBOGG_VERSION, \
-    libopencoreamr: env.OPENCOREAMR_VERSION, \
-    libopenjpeg: env.OPENJPEG_VERSION, \
-    libopus: env.OPUS_VERSION, \
-    libsamplerate: env.LIBSAMPLERATE_VERSION, \
-    libshine: env.LIBSHINE_VERSION, \
-    libsoxr: env.SOXR_VERSION, \
-    libspeex: env.SPEEX_VERSION, \
-    libtheora: env.THEORA_VERSION, \
-    libtwolame: env.TWOLAME_VERSION, \
-    libvorbis: env.VORBIS_VERSION, \
-    libwebp: env.LIBWEBP_VERSION, \
-    libxml2: env.LIBXML2_VERSION, \
-    openssl: env.OPENSSL_VERSION, \
-    }' > /versions.json
-## END FFMPEG BUILD
-
-# Removed because this build image is just intermediate
-# RUN echo "---- REMOVE BUILD DEPENDENCIES (to keep image small) ----" \
-#     && apk del --purge build-dependencies && rm -rf /tmp/*
+    && make -j$(nproc) install \
+    && rm -rf /tmp/ffmpeg*
 
 ## Actual image
 FROM docker.io/library/alpine:3.23
@@ -402,55 +80,12 @@ RUN echo "---- INSTALL RUNTIME PACKAGES ----" && \
     apk add --no-cache --update --upgrade \
     # user manipulation
     shadow \
-    # mp4v2: required libraries
-    libstdc++ \
     # bash for process script
-    bash \
-    # m4b-tool: php cli, required extensions and php settings
-    php85-cli \
-    php85-dom \
-    php85-xml \
-    php85-mbstring \
-    php85-phar \
-    php85-tokenizer \
-    php85-xmlwriter \
-    php85-openssl \
-    php85-curl \
-    php85-simplexml \
-    php85-zip \
-    && echo "date.timezone = UTC" >> /etc/php85/php.ini \
-    && ln -s /usr/bin/php85 /bin/php
-
-
-# mp4v2
-COPY --from=builder /usr/local/bin/mp4* /usr/local/bin/
-COPY --from=builder /usr/local/lib/libmp4v2* /usr/local/lib/
-
-# fdkaac
-COPY --from=builder /usr/local/bin/fdkaac /usr/local/bin/
+    bash
 
 # ffmpeg
 COPY --from=builder /usr/local/bin/ffmpeg /usr/local/bin/
 COPY --from=builder /usr/local/bin/ffprobe /usr/local/bin/
-
-# tone
-COPY --from=tone /usr/local/bin/tone /usr/local/bin/
-
-# m4b-tool
-ARG M4B_TOOL_DOWNLOAD_LINK="https://github.com/sandreas/m4b-tool/releases/latest/download/m4b-tool.phar"
-RUN echo "---- INSTALL M4B-TOOL ----" \
-    && if [ ! -f /tmp/m4b-tool.phar ]; then \
-    wget "${M4B_TOOL_DOWNLOAD_LINK}" -O /tmp/m4b-tool.phar && \
-    if [ ! -f /tmp/m4b-tool.phar ]; then \
-    tar xzf /tmp/m4b-tool.tar.gz -C /tmp/ && rm /tmp/m4b-tool.tar.gz ;\
-    fi \
-    fi \
-    && mv /tmp/m4b-tool.phar /usr/local/bin/m4b-tool \
-    && M4B_TOOL_PRE_RELEASE_LINK=$(wget -q -O - https://github.com/sandreas/m4b-tool/releases/tag/latest | grep -o 'M4B_TOOL_DOWNLOAD_LINK=[^ ]*' | head -1 | cut -d '=' -f 2) \
-    && wget "${M4B_TOOL_PRE_RELEASE_LINK}" -O /tmp/m4b-tool.tar.gz \
-    && tar xzf /tmp/m4b-tool.tar.gz -C /tmp/ && rm /tmp/m4b-tool.tar.gz \
-    && mv /tmp/m4b-tool.phar /usr/local/bin/m4b-tool-pre \
-    && chmod +x /usr/local/bin/m4b-tool /usr/local/bin/m4b-tool-pre
 
 # Volumes and environment
 VOLUME /input
