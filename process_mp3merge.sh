@@ -124,7 +124,7 @@ merge_to_m4b() {
 		printf '[CHAPTER]\nTIMEBASE=1/1000\nSTART=%d\nEND=%d\ntitle=%s\n\n' \
 			"$chapter_start" "$chapter_end" "$title" >>"$metafile"
 
-		printf "file '%s'\n" "$f" >>"$filelist"
+		printf "file '%s'\n" "${f//\'/\'\\\'\'}" >>"$filelist"
 
 		chapter_start=$chapter_end
 		file_count=$((file_count + 1))
