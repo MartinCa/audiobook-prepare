@@ -19,9 +19,9 @@ ARG FDK_AAC_SHA256=e25671cd96b10bad896aa42ab91a695a9e573395262baed4e4a2ff178d6a3
 # bump: fdkaac /FDKAAC_VERSION=([\d.]+)/ https://github.com/nu774/fdkaac.git|*
 # bump: fdkaac after ./hashupdate Dockerfile FDKAAC $LATEST
 # bump: fdkaac link "Release notes" https://github.com/nu774/fdkaac/releases/tag/v$LATEST
-ARG FDKAAC_VERSION=1.0.6
+ARG FDKAAC_VERSION=1.0.7
 ARG FDKAAC_URL="https://github.com/nu774/fdkaac/archive/v$FDKAAC_VERSION.tar.gz"
-ARG FDKAAC_SHA256=ed34c8dcae3d49d385e1ceaa380c5871cda744402358c61bcb49950a25bfae58
+ARG FDKAAC_SHA256=145d4684c9325a2bd650e46a04b03327abe780a7b59cce47e6de8af2064fb2c7
 
 # Reference: https://github.com/sandreas/dockerhub-builds
 
