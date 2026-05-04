@@ -292,9 +292,9 @@ RUN echo "---- vorbis ----" && \
 # bump: libwebp after ./hashupdate Dockerfile LIBWEBP $LATEST
 # bump: libwebp link "Release notes" https://github.com/webmproject/libwebp/releases/tag/v$LATEST
 # bump: libwebp link "Source diff $CURRENT..$LATEST" https://github.com/webmproject/libwebp/compare/v$CURRENT..v$LATEST
-ARG LIBWEBP_VERSION=1.6.0
+ARG LIBWEBP_VERSION=0.1.2
 ARG LIBWEBP_URL="https://github.com/webmproject/libwebp/archive/v$LIBWEBP_VERSION.tar.gz"
-ARG LIBWEBP_SHA256=93a852c2b3efafee3723efd4636de855b46f9fe1efddd607e1f42f60fc8f2136
+ARG LIBWEBP_SHA256=87cf2c48e1ccab4de0a114ebfa877ada3b7d13cb756aa078224b1bf47865b479
 RUN echo "---- libwebp ----" && \
     wget $WGET_OPTS -O libwebp.tar.gz "$LIBWEBP_URL" && \
     echo "$LIBWEBP_SHA256  libwebp.tar.gz" | sha256sum --status -c - && \
