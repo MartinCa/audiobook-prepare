@@ -281,11 +281,11 @@ while [ "$keep_running" -eq 1 ]; do
 				fi
 
 				# Move ebook files
-				numberofebookfiles=$(find "$dir_item" -type f \( -name "*.mobi" -o -name "*.pdf" -o -name "*.epub" -o -name "*.azw" -o -name "*.azw3" \) | wc -l)
+				numberofebookfiles=$(find "$dir_item" -type f \( -name "*.mobi" -o -name "*.pdf" -o -name "*.epub" -o -name "*.azw" -o -name "*.azw3" -o -name "*.kfx" -o -name "*.fb2" -o -name "*.djvu" \) | wc -l)
 
 				if [[ $numberofebookfiles -gt 0 ]]; then
 					mkdir -p "$ebookfilesdir$dir_item"
-					find "$dir_item" -type f \( -name "*.mobi" -o -name "*.pdf" -o -name "*.epub" -o -name "*.azw" -o -name "*.azw3" \) -exec cp '{}' "$ebookfilesdir"'{}' \; -exec echo "  Moved ebook file to $ebookfilesdir"'{}' \;
+					find "$dir_item" -type f \( -name "*.mobi" -o -name "*.pdf" -o -name "*.epub" -o -name "*.azw" -o -name "*.azw3" -o -name "*.kfx" -o -name "*.fb2" -o -name "*.djvu" \) -exec cp '{}' "$ebookfilesdir"'{}' \; -exec echo "  Moved ebook file to $ebookfilesdir"'{}' \;
 					echo "$(date -I'seconds') MOVED Ebook files for $dir_item" >>"$logfile"
 				fi
 
