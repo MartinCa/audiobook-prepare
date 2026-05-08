@@ -34,6 +34,6 @@ jobs:
         run: git config --global url."https://x-access-token:${APP_TOKEN}@github.com/".insteadOf "https://github.com/"
 
       - name: Bump versions
-        uses: wader/bump/action@771bb30f8fb13ad5867dacec5ccadd43b89e777e # master
+        uses: wader/bump/action@c1bfe20e7043cd7c56baf9d38dfff17b605631a2 # master
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
