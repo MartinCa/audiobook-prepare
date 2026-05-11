@@ -46,9 +46,9 @@ ARG LDFLAGS="-Wl,-z,relro,-z,now"
 # bump: ffmpeg after ./hashupdate Dockerfile FFMPEG $LATEST
 # bump: ffmpeg link "Changelog" https://github.com/FFmpeg/FFmpeg/blob/n$LATEST/Changelog
 # bump: ffmpeg link "Source diff $CURRENT..$LATEST" https://github.com/FFmpeg/FFmpeg/compare/n$CURRENT..n$LATEST
-ARG FFMPEG_VERSION=7.1.3
+ARG FFMPEG_VERSION=7.1.4
 ARG FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2"
-ARG FFMPEG_SHA256=e7df715136a1231598dadb70fe6abd5cd66abc1ac2f470a02c567b2600c5292b
+ARG FFMPEG_SHA256=de02003e8a7f7b08179ddf4a1fdc2599570ca02725fec9a1e465374fd4e514aa
 # sed changes --toolchain=hardened -pie to -static-pie
 RUN echo "---- COMPILE FFMPEG ----" && \
     curl -fSL --retry 3 --retry-delay 2 -o /tmp/ffmpeg.tar.bz2 "$FFMPEG_URL" && \
