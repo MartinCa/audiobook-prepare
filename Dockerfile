@@ -1,4 +1,4 @@
-FROM docker.io/library/alpine:3.23 AS builder
+FROM docker.io/library/alpine:3.24 AS builder
 
 RUN echo "---- INSTALL BUILD DEPENDENCIES ----" && \
     apk add --no-cache \
@@ -74,7 +74,7 @@ RUN echo "---- COMPILE FFMPEG ----" && \
     && rm -rf /tmp/ffmpeg*
 
 ## Actual image
-FROM docker.io/library/alpine:3.23
+FROM docker.io/library/alpine:3.24
 
 RUN echo "---- INSTALL RUNTIME PACKAGES ----" && \
     apk add --no-cache --update --upgrade \
