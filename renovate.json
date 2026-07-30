@@ -1,7 +1,4 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
-  ],
-  "minimumReleaseAge": "4 days"
+  "extends": ["github>MartinCa/renovate-config"]
 }
