@@ -1,6 +1,6 @@
 services:
   audiobook-prepare:
-    image: martinc01/audiobook-prepare
+    image: martinc01/audiobook-prepare@sha256:fec7986a84ff0a1570f6327aa355e135c9156e36a73e2a46533ee3cd07124bae
     container_name: audiobook-prepare
     volumes:
       - /mnt/user/data/process/audiobooks/mp3merge:/input
