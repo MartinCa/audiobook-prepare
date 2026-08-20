@@ -80,6 +80,8 @@ RUN echo "---- INSTALL RUNTIME PACKAGES ----" && \
     apk add --no-cache --update --upgrade \
     # user manipulation
     shadow \
+    # drop privileges via exec so our script stays PID 1 and receives signals
+    su-exec \
     # bash for process script
     bash
 

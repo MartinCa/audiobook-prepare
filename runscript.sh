@@ -12,4 +12,6 @@ User uid: $(id -u appuser)
 User gid: $(id -g appuser)
 "
 
-su -c "/app/process_mp3merge.sh" -m appuser
+# exec (not fork via `su`) so process_mp3merge.sh replaces this shell as PID 1
+# and receives termination signals directly instead of them being swallowed.
+exec su-exec appuser:appgroup /app/process_mp3merge.sh

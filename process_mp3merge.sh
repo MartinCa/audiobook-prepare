@@ -66,6 +66,39 @@ fi
 
 keep_running=1
 
+# PID/paths of the ffmpeg work currently in flight, so a termination signal
+# can stop it and clean up instead of leaving a partial/corrupt file behind
+# for a future run to trip over.
+CURRENT_FFMPEG_PID=""
+CURRENT_PARTIAL_OUTPUT=""
+CURRENT_TMPDIR=""
+
+handle_termination() {
+	log "Received termination signal, shutting down"
+
+	if [ -n "$CURRENT_FFMPEG_PID" ] && kill -0 "$CURRENT_FFMPEG_PID" 2>/dev/null; then
+		log "  Stopping in-progress ffmpeg (pid $CURRENT_FFMPEG_PID)"
+		kill -TERM "$CURRENT_FFMPEG_PID" 2>/dev/null
+		wait "$CURRENT_FFMPEG_PID" 2>/dev/null
+	fi
+
+	if [ -n "$CURRENT_PARTIAL_OUTPUT" ] && [ -f "$CURRENT_PARTIAL_OUTPUT" ]; then
+		log "  Removing partial output '$CURRENT_PARTIAL_OUTPUT'"
+		rm -f "$CURRENT_PARTIAL_OUTPUT"
+	fi
+
+	if [ -n "$CURRENT_TMPDIR" ] && [ -d "$CURRENT_TMPDIR" ]; then
+		log "  Removing temp directory '$CURRENT_TMPDIR'"
+		rm -rf "$CURRENT_TMPDIR"
+	fi
+
+	echo "$(date -I'seconds') INTERRUPTED processing stopped by termination signal" >>"$logfile"
+	log "Exiting"
+	exit 143
+}
+
+trap handle_termination TERM INT
+
 get_audio_bitrate() {
 	local file="$1"
 	local bitrate
@@ -104,6 +137,7 @@ merge_to_m4b() {
 
 	local tmpdir
 	tmpdir=$(mktemp -d)
+	CURRENT_TMPDIR="$tmpdir"
 	local filelist="$tmpdir/files.txt"
 	local metafile="$tmpdir/metadata.txt"
 
@@ -143,6 +177,7 @@ merge_to_m4b() {
 
 	if [ "$file_count" -eq 0 ]; then
 		rm -rf "$tmpdir"
+		CURRENT_TMPDIR=""
 		MERGE_ERROR="No audio files found in $source_dir"
 		log "$MERGE_ERROR"
 		return 1
@@ -150,6 +185,7 @@ merge_to_m4b() {
 
 	local tmplog
 	tmplog=$(mktemp)
+	CURRENT_PARTIAL_OUTPUT="$output_file"
 	ffmpeg -y -hide_banner -loglevel error -stats -stats_period 30 \
 		-f concat -safe 0 -i "$filelist" \
 		-i "$metafile" \
@@ -161,10 +197,15 @@ merge_to_m4b() {
 		-vn \
 		-threads "$CPUcores" \
 		-f mp4 \
-		"$output_file" 2>&1 | tee "$tmplog"
-	local result=${PIPESTATUS[0]}
+		"$output_file" > >(tee "$tmplog") 2>&1 &
+	CURRENT_FFMPEG_PID=$!
+	wait "$CURRENT_FFMPEG_PID"
+	local result=$?
+	CURRENT_FFMPEG_PID=""
+	CURRENT_PARTIAL_OUTPUT=""
 
 	rm -rf "$tmpdir"
+	CURRENT_TMPDIR=""
 
 	if [ $result -ne 0 ]; then
 		MERGE_ERROR=$(cat "$tmplog")
@@ -225,6 +266,7 @@ while [ "$keep_running" -eq 1 ]; do
 						log "  Detected bitrate of $bitrate"
 
 						tmplog=$(mktemp)
+						CURRENT_PARTIAL_OUTPUT="$destdir$m4bfilename"
 						ffmpeg -y -hide_banner -loglevel error -stats -stats_period 30 \
 							-i "$full_source_path" \
 							-c:a libfdk_aac \
@@ -232,8 +274,12 @@ while [ "$keep_running" -eq 1 ]; do
 							-vn \
 							-threads "$CPUcores" \
 							-f mp4 \
-							"$destdir$m4bfilename" 2>&1 | tee "$tmplog"
-						cmdresult=${PIPESTATUS[0]}
+							"$destdir$m4bfilename" > >(tee "$tmplog") 2>&1 &
+						CURRENT_FFMPEG_PID=$!
+						wait "$CURRENT_FFMPEG_PID"
+						cmdresult=$?
+						CURRENT_FFMPEG_PID=""
+						CURRENT_PARTIAL_OUTPUT=""
 
 						if [ "$cmdresult" -ne 0 ]; then
 							logerror=$(cat "$tmplog")
