@@ -9,6 +9,14 @@ teardown() {
 	rm -rf "$workdir"
 }
 
+# --- log ---------------------------------------------------------------
+
+@test "log: prefixes message with a timestamp" {
+	run log "hello world"
+	[ "$status" -eq 0 ]
+	[[ "$output" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}:[0-9]{2}\ hello\ world$ ]]
+}
+
 # --- duration_to_seconds ---------------------------------------------------
 
 @test "duration_to_seconds: bare number is seconds" {

@@ -3,6 +3,12 @@
 # Keep this file free of side effects (no cd/mkdir/loops) so it can be
 # sourced safely in isolation.
 
+# Print $* to stdout prefixed with a self-contained timestamp, independent
+# of whatever timestamp (if any) an external log collector/viewer adds.
+log() {
+	printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
+}
+
 # Convert a duration such as "90", "90s", "2m" or "1h" to whole seconds.
 # Outputs nothing and returns 1 if the value cannot be understood.
 duration_to_seconds() {
@@ -52,7 +58,7 @@ is_stable() {
 	fi
 
 	if [ ! -e "$item" ]; then
-		echo "  Skipping $item, it is no longer present"
+		log "  Skipping $item, it is no longer present"
 		return 1
 	fi
 
@@ -65,7 +71,7 @@ is_stable() {
 	fi
 
 	if [ "$scanresult" -ne 0 ]; then
-		echo "  Skipping $item, could not read modification times of everything in it"
+		log "  Skipping $item, could not read modification times of everything in it"
 		return 1
 	fi
 
@@ -73,7 +79,7 @@ is_stable() {
 
 	case "$newest" in
 	'' | *[!0-9]*)
-		echo "  Skipping $item, could not determine when it was last modified"
+		log "  Skipping $item, could not determine when it was last modified"
 		return 1
 		;;
 	esac
@@ -82,12 +88,12 @@ is_stable() {
 	age=$((now - newest))
 
 	if [ "$age" -lt 0 ]; then
-		echo "  Skipping $item, it was modified in the future, check the clock on the source"
+		log "  Skipping $item, it was modified in the future, check the clock on the source"
 		return 1
 	fi
 
 	if [ "$age" -lt "$stabletime" ]; then
-		echo "  Skipping $item, last modified ${age}s ago, waiting for ${stabletime}s of no activity"
+		log "  Skipping $item, last modified ${age}s ago, waiting for ${stabletime}s of no activity"
 		return 1
 	fi
 
