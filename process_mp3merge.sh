@@ -20,47 +20,47 @@ mkdir -p "$ebookfilesdir"
 
 # CPU Cores used for ffmpeg encoding threads
 if [ -z "$CPU_CORES" ]; then
-	echo "Using all CPU cores as CPU_CORES ENV not set."
+	log "Using all CPU cores as CPU_CORES ENV not set."
 	CPUcores=$(nproc --all)
 else
-	echo "Using $CPU_CORES CPU cores as defined."
+	log "Using $CPU_CORES CPU cores as defined."
 	CPUcores="$CPU_CORES"
 fi
 
 if [ "$MONITOR_DIR" != 1 ]; then
-	echo "Only doing single run"
+	log "Only doing single run"
 else
-	echo "Continously running monitoring directory"
+	log "Continously running monitoring directory"
 fi
 
 # Run interval
 if [ -z "$SLEEPTIME" ]; then
-	echo "Using standard 5 min sleep time."
+	log "Using standard 5 min sleep time."
 	sleeptime=5m
 else
-	echo "Using $SLEEPTIME sleep time."
+	log "Using $SLEEPTIME sleep time."
 	sleeptime="$SLEEPTIME"
 fi
 
 # Time an item must be untouched before it is considered fully copied
 if [ -z "$STABLE_TIME" ]; then
-	echo "Using standard 2 min stability window."
+	log "Using standard 2 min stability window."
 	stabletime=120
 else
 	stabletime=$(duration_to_seconds "$STABLE_TIME")
 	if [ -z "$stabletime" ]; then
-		echo "Could not understand STABLE_TIME '$STABLE_TIME', using standard 2 min stability window."
+		log "Could not understand STABLE_TIME '$STABLE_TIME', using standard 2 min stability window."
 		stabletime=120
 	elif [ "$stabletime" -eq 0 ]; then
-		echo "Stability window disabled as STABLE_TIME is 0, items are processed as soon as they are seen."
+		log "Stability window disabled as STABLE_TIME is 0, items are processed as soon as they are seen."
 	else
-		echo "Using $stabletime second stability window."
+		log "Using $stabletime second stability window."
 	fi
 fi
 
 if [ "$stabletime" -gt 0 ] && ! stat -c '%Y' "$logfile" >/dev/null 2>&1; then
-	echo "ERROR: 'stat -c %Y' is not supported in this image, cannot verify that files have finished copying."
-	echo "ERROR: Nothing will be processed. Set STABLE_TIME=0 to disable the check (unsafe) or fix the image."
+	log "ERROR: 'stat -c %Y' is not supported in this image, cannot verify that files have finished copying."
+	log "ERROR: Nothing will be processed. Set STABLE_TIME=0 to disable the check (unsafe) or fix the image."
 	echo "$(date -I'seconds') ERROR stat unsupported, stability check cannot run" >>"$logfile"
 fi
 
@@ -121,7 +121,7 @@ merge_to_m4b() {
 			awk '{printf "%d", int($1 * 1000 + 0.5)}')
 
 		if [ -z "$dur_ms" ] || ! [ "$dur_ms" -gt 0 ] 2>/dev/null; then
-			echo "  Warning: could not get duration for $f, skipping"
+			log "  Warning: could not get duration for $f, skipping"
 			continue
 		fi
 
@@ -144,13 +144,13 @@ merge_to_m4b() {
 	if [ "$file_count" -eq 0 ]; then
 		rm -rf "$tmpdir"
 		MERGE_ERROR="No audio files found in $source_dir"
-		printf '%s\n' "$MERGE_ERROR"
+		log "$MERGE_ERROR"
 		return 1
 	fi
 
 	local tmplog
 	tmplog=$(mktemp)
-	ffmpeg -y -hide_banner \
+	ffmpeg -y -hide_banner -loglevel error -stats -stats_period 30 \
 		-f concat -safe 0 -i "$filelist" \
 		-i "$metafile" \
 		-map 0:a \
@@ -191,7 +191,7 @@ while [ "$keep_running" -eq 1 ]; do
 			cmdresult=1
 			action="NONE"
 			logerror=""
-			echo "Processing $dir_item"
+			log "Processing $dir_item"
 
 			full_source_path="$mp3mergedir$dir_item"
 			destdir="$untaggeddir$dir_item/"
@@ -203,7 +203,7 @@ while [ "$keep_running" -eq 1 ]; do
 				if [ "${dir_item: -4}" == ".m4b" ]; then
 					# Separate m4b file in root, move straight to untagged for tagging
 					action="MOVE"
-					echo "  Moving single m4b file '$full_source_path' to '$destdir'"
+					log "  Moving single m4b file '$full_source_path' to '$destdir'"
 					mkdir -p "$destdir"
 					logerror=$(mv "$full_source_path" "$destdir" 2>&1)
 					cmdresult=$?
@@ -212,7 +212,7 @@ while [ "$keep_running" -eq 1 ]; do
 					m4bfilename="$filename_excl_ext$m4bext"
 
 					action="MERGE"
-					echo "  Converting single media file '$full_source_path' to '$destdir$m4bfilename'"
+					log "  Converting single media file '$full_source_path' to '$destdir$m4bfilename'"
 
 					if [ -f "$destdir$m4bfilename" ]; then
 						logerror="Destination file '$destdir$m4bfilename' already exists"
@@ -220,12 +220,12 @@ while [ "$keep_running" -eq 1 ]; do
 					else
 						mkdir -p "$destdir"
 
-						echo "  Sampling bitrate of $full_source_path"
+						log "  Sampling bitrate of $full_source_path"
 						bitrate=$(get_audio_bitrate "$full_source_path")
-						echo "  Detected bitrate of $bitrate"
+						log "  Detected bitrate of $bitrate"
 
 						tmplog=$(mktemp)
-						ffmpeg -y -hide_banner \
+						ffmpeg -y -hide_banner -loglevel error -stats -stats_period 30 \
 							-i "$full_source_path" \
 							-c:a libfdk_aac \
 							-b:a "$bitrate" \
@@ -240,7 +240,7 @@ while [ "$keep_running" -eq 1 ]; do
 							rm -f "$destdir$m4bfilename"
 							rmdir "$destdir" 2>/dev/null
 						else
-							echo "  Setting permissions"
+							log "  Setting permissions"
 							chmod -R a=,a+rwX "$destdir"
 						fi
 						rm -f "$tmplog"
@@ -253,7 +253,7 @@ while [ "$keep_running" -eq 1 ]; do
 				if [[ $numberofm4bfiles -eq 1 ]]; then
 					# Only 1 m4b file so we copy dir straight to untagged for tagging
 					action="COPY"
-					echo "  Copying single m4b file in '$full_source_path' to '$destdir'"
+					log "  Copying single m4b file in '$full_source_path' to '$destdir'"
 					mkdir -p "$destdir"
 					logerror=$(cp "$full_source_path"/*.m4b "$destdir" 2>&1)
 					cmdresult=$?
@@ -265,7 +265,7 @@ while [ "$keep_running" -eq 1 ]; do
 					filename_excl_ext=$dir_item
 					m4bfilename="$filename_excl_ext$m4bext"
 
-					echo "  Merging $dir_item to $destdir$m4bfilename"
+					log "  Merging $dir_item to $destdir$m4bfilename"
 
 					if [ -f "$destdir$m4bfilename" ]; then
 						logerror="Destination file '$destdir$m4bfilename' already exists"
@@ -278,14 +278,14 @@ while [ "$keep_running" -eq 1 ]; do
 						if [ -z "$samplefile" ]; then
 							bitrate=64000
 						else
-							echo "  Sampling bitrate of $samplefile"
+							log "  Sampling bitrate of $samplefile"
 							bitrate=$(get_audio_bitrate "$mp3mergedir$samplefile")
-							echo "  Detected bitrate of $bitrate"
+							log "  Detected bitrate of $bitrate"
 						fi
 
 						if merge_to_m4b "$full_source_path" "$destdir$m4bfilename" "$bitrate"; then
 							cmdresult=0
-							echo "  Setting permissions"
+							log "  Setting permissions"
 							chmod -R a=,a+rwX "$destdir"
 						else
 							cmdresult=1
@@ -308,17 +308,17 @@ while [ "$keep_running" -eq 1 ]; do
 			fi
 
 			if [ "$cmdresult" -eq 0 ]; then
-				echo "  Processing succeeded"
+				log "  Processing succeeded"
 				rm -rf "$full_source_path"
 				echo "$(date -I'seconds') SUCCESS $action $dir_item" >>"$logfile"
 			else
-				echo "  ERROR: Processing failed: $logerror"
+				log "  ERROR: Processing failed: $logerror"
 				cp -r "$full_source_path" "$faileddir" && rm -rf "$full_source_path"
 				log_error=$(printf '%s' "$logerror" | tail -5 | tr '\n' '|')
 				echo "$(date -I'seconds') FAILED $action $dir_item: $log_error" >>"$logfile"
 			fi
 		else
-			echo "Ignored $dir_item"
+			log "Ignored $dir_item"
 		fi
 		echo ""
 	done
@@ -326,7 +326,7 @@ while [ "$keep_running" -eq 1 ]; do
 	if [ "$MONITOR_DIR" != 1 ]; then
 		keep_running=0
 	else
-		echo "Done for now, sleeping for $sleeptime"
+		log "Done for now, sleeping for $sleeptime"
 		sleep $sleeptime
 	fi
 done
