@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$(dirname "$0")/lib.sh"
+
 mp3mergedir="/input/"
 untaggeddir="/output/"
 faileddir="/failed/"
@@ -40,22 +42,29 @@ else
 	sleeptime="$SLEEPTIME"
 fi
 
-keep_running=1
-
-is_media_file() {
-	if [ ! -f "$1" ]; then
-		return 1
+# Time an item must be untouched before it is considered fully copied
+if [ -z "$STABLE_TIME" ]; then
+	echo "Using standard 2 min stability window."
+	stabletime=120
+else
+	stabletime=$(duration_to_seconds "$STABLE_TIME")
+	if [ -z "$stabletime" ]; then
+		echo "Could not understand STABLE_TIME '$STABLE_TIME', using standard 2 min stability window."
+		stabletime=120
+	elif [ "$stabletime" -eq 0 ]; then
+		echo "Stability window disabled as STABLE_TIME is 0, items are processed as soon as they are seen."
+	else
+		echo "Using $stabletime second stability window."
 	fi
+fi
 
-	case "${1: -4}" in
-	.m4b | .mp3 | .mp4 | .m4a | .ogg | .aac | .wma)
-		return 0
-		;;
-	*)
-		return 1
-		;;
-	esac
-}
+if [ "$stabletime" -gt 0 ] && ! stat -c '%Y' "$logfile" >/dev/null 2>&1; then
+	echo "ERROR: 'stat -c %Y' is not supported in this image, cannot verify that files have finished copying."
+	echo "ERROR: Nothing will be processed. Set STABLE_TIME=0 to disable the check (unsafe) or fix the image."
+	echo "$(date -I'seconds') ERROR stat unsupported, stability check cannot run" >>"$logfile"
+fi
+
+keep_running=1
 
 get_audio_bitrate() {
 	local file="$1"
@@ -174,6 +183,11 @@ while [ "$keep_running" -eq 1 ]; do
 		dir_item_is_mediafile=$?
 
 		if [ -d "$dir_item" ] || [ "$dir_item_is_mediafile" -eq 0 ]; then
+			if ! is_stable "$dir_item"; then
+				echo ""
+				continue
+			fi
+
 			cmdresult=1
 			action="NONE"
 			logerror=""

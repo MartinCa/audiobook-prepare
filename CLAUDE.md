@@ -56,8 +56,9 @@ podman compose build --no-cache
 |----------|---------|---------|
 | PUID/PGID | 1000 | Container user/group ID for file ownership |
 | CPU_CORES | auto | Cores allocated to FFmpeg encoding (`-threads`) |
-| MONITOR_DIR | 0 | 1=continuous monitoring, 0=single run |
-| SLEEPTIME | 5m | Interval between processing runs |
+| MONITOR_DIR | 1 | 1=continuous monitoring, 0=single run |
+| SLEEPTIME | 5m | Interval between processing runs (when MONITOR_DIR=1) |
+| STABLE_TIME | 2m | Time a file/folder must be unchanged before it's processed; guards against partial copies. 0 disables |
 
 ## Key Tools Used
 

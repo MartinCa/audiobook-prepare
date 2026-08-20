@@ -99,11 +99,13 @@ ENV PGID=""
 ENV CPU_CORES=""
 ENV MONITOR_DIR=1
 ENV SLEEPTIME=""
+ENV STABLE_TIME=""
 
 #Import scripts
 WORKDIR /app
 COPY runscript.sh /app/
 COPY process_mp3merge.sh /app/
+COPY lib.sh /app/
 RUN addgroup appgroup -g 911
 RUN adduser -D -u 911 -h /app -G appgroup appuser
 RUN chown appuser:appgroup /app/*.sh
