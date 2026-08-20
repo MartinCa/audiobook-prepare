@@ -2,6 +2,7 @@ services:
   audiobook-prepare:
     image: martinc01/audiobook-prepare@sha256:fec7986a84ff0a1570f6327aa355e135c9156e36a73e2a46533ee3cd07124bae
     container_name: audiobook-prepare
+    restart: unless-stopped
     volumes:
       - /mnt/user/data/process/audiobooks/mp3merge:/input
       - /mnt/user/data/process/audiobooks/untagged:/output
@@ -12,5 +13,6 @@ services:
       - PUID=99
       - PGID=100
       - CPU_CORES=4
-      - MONITOR_DIR=0
+      - MONITOR_DIR=1
       - SLEEPTIME=5m
+      - STABLE_TIME=120

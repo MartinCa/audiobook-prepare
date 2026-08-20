@@ -41,11 +41,18 @@ This docker uses the following folders which should be mapped as volumes:
 
 ### Environment variables
 
-| Environment variable | Description                                                     |
-| :------------------- | :-------------------------------------------------------------- |
-| PUID                 | Id of the user running the application                          |
-| PGUID                | Id of the group of the user running the application             |
-| CPU_CORES            | Number of CPU cores to use for m4b-tool                         |
-| MONITOR_DIR          | Set to 1 to keep running the application to check for new files |
-| SLEEPTIME            | Time to sleep between each run, only used if MONITOR_DIR is 1   |
+| Environment variable | Description                                                                          |
+| :-------------------- | :------------------------------------------------------------------------------------ |
+| PUID                  | Id of the user running the application                                                |
+| PGID                  | Id of the group of the user running the application                                   |
+| CPU_CORES             | Number of CPU cores to use for m4b-tool                                               |
+| MONITOR_DIR           | Set to 1 to keep running the application to check for new files                       |
+| SLEEPTIME             | Time to sleep between each run, only used if MONITOR_DIR is 1                         |
+| STABLE_TIME           | Time (e.g. `120`, `2m`) a file/folder must be unchanged before it's processed. Default 2 min. Set to 0 to disable. |
+
+### Automatic processing
+
+With `MONITOR_DIR=1` (the image's default) the container stays running and rescans `/input` every `SLEEPTIME` — just `docker-compose up -d` it and drop files in. If you'd rather trigger runs externally (e.g. via a scheduler or a GitOps deployment tool), set `MONITOR_DIR=0` and have that tool start/run the container on its own schedule instead; `SLEEPTIME` is ignored in that mode.
+
+Either way, `STABLE_TIME` protects against picking up a file/folder that's still being copied into `/input`: nothing is touched until it has been unmodified for that long, so a partial copy is simply skipped and retried on the next pass/run. Worst-case latency between a copy finishing and it being processed is roughly `STABLE_TIME + SLEEPTIME`.
 
