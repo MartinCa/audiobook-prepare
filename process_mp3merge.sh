@@ -1,5 +1,7 @@
 #!/bin/bash
 
+shopt -s nullglob
+
 source "$(dirname "$0")/lib.sh"
 
 mp3mergedir="/input/"
