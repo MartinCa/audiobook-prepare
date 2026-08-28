@@ -128,6 +128,51 @@ get_audio_bitrate() {
 	echo "$bitrate"
 }
 
+# Losslessly remux an m4b in place to normalize its chunk layout.
+#
+# Files that only pass through this tool untouched (a lone source .m4b that
+# is just moved/copied to /output) can already carry a QuickTime chapter
+# track whose sample data is stored non-contiguously (interleaved with the
+# audio track's own data) by whatever originally produced them. That layout
+# is invisible to playback and most tag readers, but tools that rewrite
+# tags in place with a read-modify-write MP4 muxer (e.g. the ATL library)
+# refuse to touch such a chapter track and silently drop all chapter data,
+# so the "fix" turns into a no-op save. A `-c copy` remux rebuilds the
+# chunk-offset tables and makes the chapter samples contiguous again.
+#
+# Best-effort: on failure the original file is left untouched and a warning
+# is logged, since this is a safety net on top of already-working output,
+# not something that should fail the whole job.
+remux_m4b() {
+	local file="$1"
+	local tmpfile="$file.remux.tmp"
+	local tmplog
+	tmplog=$(mktemp)
+
+	CURRENT_PARTIAL_OUTPUT="$tmpfile"
+	ffmpeg -y -hide_banner -loglevel error \
+		-i "$file" \
+		-c copy \
+		-map_metadata 0 \
+		-f mp4 \
+		"$tmpfile" > >(tee "$tmplog") 2>&1 &
+	CURRENT_FFMPEG_PID=$!
+	wait "$CURRENT_FFMPEG_PID"
+	local result=$?
+	CURRENT_FFMPEG_PID=""
+	CURRENT_PARTIAL_OUTPUT=""
+
+	if [ $result -ne 0 ] || [ ! -s "$tmpfile" ]; then
+		log "  Warning: could not normalize chapter layout of '$file', keeping original: $(cat "$tmplog" | tail -3)"
+		rm -f "$tmpfile" "$tmplog"
+		return 1
+	fi
+
+	mv "$tmpfile" "$file"
+	rm -f "$tmplog"
+	return 0
+}
+
 MERGE_ERROR=""
 
 # Merge all audio files in source_dir into a single M4B with chapter markers
@@ -250,6 +295,11 @@ while [ "$keep_running" -eq 1 ]; do
 					mkdir -p "$destdir"
 					logerror=$(mv "$full_source_path" "$destdir" 2>&1)
 					cmdresult=$?
+
+					if [ "$cmdresult" -eq 0 ]; then
+						log "  Normalizing chapter layout of '$destdir$dir_item'"
+						remux_m4b "$destdir$dir_item"
+					fi
 				else
 					# Separate non m4b file in root, convert to m4b
 					m4bfilename="$filename_excl_ext$m4bext"
@@ -305,6 +355,13 @@ while [ "$keep_running" -eq 1 ]; do
 					mkdir -p "$destdir"
 					logerror=$(cp "$full_source_path"/*.m4b "$destdir" 2>&1)
 					cmdresult=$?
+
+					if [ "$cmdresult" -eq 0 ]; then
+						for copied_m4b in "$destdir"*.m4b; do
+							log "  Normalizing chapter layout of '$copied_m4b'"
+							remux_m4b "$copied_m4b"
+						done
+					fi
 				else
 					# We have either 0 or more than 1 m4b file so we have to merge the files.
 					# Merged m4b file is output to untagged.
