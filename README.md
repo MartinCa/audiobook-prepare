@@ -49,10 +49,35 @@ This docker uses the following folders which should be mapped as volumes:
 | MONITOR_DIR           | Set to 1 to keep running the application to check for new files                       |
 | SLEEPTIME             | Time to sleep between each run, only used if MONITOR_DIR is 1                         |
 | STABLE_TIME           | Time (e.g. `120`, `2m`) a file/folder must be unchanged before it's processed. Default 2 min. Set to 0 to disable. |
+| VERIFY_OUTPUT         | Decode every finished m4b to check it before publishing it. Default 1. Set to 0 to disable.        |
 
 ### Automatic processing
 
 With `MONITOR_DIR=1` (the image's default) the container stays running and rescans `/input` every `SLEEPTIME` — just `docker-compose up -d` it and drop files in. If you'd rather trigger runs externally (e.g. via a scheduler or a GitOps deployment tool), set `MONITOR_DIR=0` and have that tool start/run the container on its own schedule instead; `SLEEPTIME` is ignored in that mode.
 
 Either way, `STABLE_TIME` protects against picking up a file/folder that's still being copied into `/input`: nothing is touched until it has been unmodified for that long, so a partial copy is simply skipped and retried on the next pass/run. Worst-case latency between a copy finishing and it being processed is roughly `STABLE_TIME + SLEEPTIME`.
+
+### Output verification
+
+Before an m4b is published, every sample in it is decoded to confirm the file
+is actually intact — whether it was merged, converted, or simply passed
+through untouched. A file fails verification if it has no audio stream, if
+decoding it produces any error, or if less audio comes out of it than the
+container claims to hold. Failures are treated like any other conversion
+failure: the book is moved to `/failed` with the reason in `processing.log`,
+and nothing is written to `/output`.
+
+This catches the corruption that a plain exit-code check misses. ffmpeg exits
+successfully on many decode errors, and a truncated m4b — a copy interrupted
+by a full disk, or a source file that was already damaged before it arrived —
+decodes cleanly right up until it stops early, so it would otherwise be
+published, tagged, and only noticed halfway through a listen.
+
+The cost is one decode pass over the finished file, which is far cheaper than
+the encode: roughly 45 seconds for a 3 hour book on four cores. Set
+`VERIFY_OUTPUT=0` to skip it.
+
+Note that this checks the finished file's own integrity, not that it faithfully
+reproduces the source. A source file whose audio is damaged but still decodable
+re-encodes into a perfectly valid m4b, and that m4b passes verification.
 

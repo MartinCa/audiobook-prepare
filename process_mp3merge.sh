@@ -60,6 +60,15 @@ else
 	fi
 fi
 
+# Full decode of every finished m4b before it is published
+if [ -z "$VERIFY_OUTPUT" ] || [ "$VERIFY_OUTPUT" = 1 ]; then
+	verifyoutput=1
+	log "Verifying finished m4b files by decoding them in full."
+else
+	verifyoutput=0
+	log "Not verifying finished m4b files as VERIFY_OUTPUT is '$VERIFY_OUTPUT'."
+fi
+
 if [ "$stabletime" -gt 0 ] && ! stat -c '%Y' "$logfile" >/dev/null 2>&1; then
 	log "ERROR: 'stat -c %Y' is not supported in this image, cannot verify that files have finished copying."
 	log "ERROR: Nothing will be processed. Set STABLE_TIME=0 to disable the check (unsafe) or fix the image."
@@ -126,6 +135,117 @@ get_audio_bitrate() {
 	fi
 
 	echo "$bitrate"
+}
+
+# Duration of a media file in whole milliseconds, empty if it cannot be read.
+probe_duration_ms() {
+	ffprobe -v quiet \
+		-show_entries format=duration \
+		-of default=noprint_wrappers=1:nokey=1 \
+		-i "$1" 2>/dev/null |
+		awk '{printf "%d", int($1 * 1000 + 0.5)}'
+}
+
+VERIFY_ERROR=""
+
+# Decode a finished m4b from end to end to confirm it is intact before it is
+# published, whether it was merged, converted or just passed through. Three
+# things have to hold, cheapest first so a hopeless file fails in milliseconds:
+#
+#   1. It has an audio stream and a duration at all.
+#   2. Decoding every sample produces no errors. ffmpeg exits 0 on plenty of
+#      decode errors, so any output at -v error counts as a failure too.
+#   3. As much audio comes out as the container claims to hold. A truncated
+#      mp4 decodes perfectly cleanly, it just stops early, which is exactly
+#      what a copy onto a full disk or a half-written mux looks like.
+#
+# Sets VERIFY_ERROR and returns 1 on failure.
+verify_m4b() {
+	local file="$1"
+
+	VERIFY_ERROR=""
+
+	if [ "$verifyoutput" -ne 1 ]; then
+		return 0
+	fi
+
+	log "  Verifying '$file'"
+
+	if [ ! -s "$file" ]; then
+		VERIFY_ERROR="'$file' is missing or empty"
+		return 1
+	fi
+
+	local codec_type
+	codec_type=$(ffprobe -hide_banner -loglevel quiet \
+		-select_streams a:0 \
+		-show_entries stream=codec_type \
+		-of default=noprint_wrappers=1:nokey=1 \
+		-i "$file" 2>/dev/null)
+
+	if [ "$codec_type" != "audio" ]; then
+		VERIFY_ERROR="'$file' has no audio stream"
+		return 1
+	fi
+
+	local declared_ms
+	declared_ms=$(probe_duration_ms "$file")
+
+	if [ -z "$declared_ms" ] || ! [ "$declared_ms" -gt 0 ] 2>/dev/null; then
+		VERIFY_ERROR="'$file' reports no duration"
+		return 1
+	fi
+
+	local tmpdir
+	tmpdir=$(mktemp -d)
+	CURRENT_TMPDIR="$tmpdir"
+	local progressfile="$tmpdir/progress"
+	local tmplog="$tmpdir/ffmpeg.log"
+
+	# -progress writes to a file rather than a pipe so $! stays ffmpeg's own
+	# pid for the termination trap, and -nostats keeps stderr free of progress
+	# chatter so that its emptiness is a meaningful signal.
+	#
+	# CURRENT_PARTIAL_OUTPUT is deliberately left unset here: unlike everywhere
+	# else in this script the file is a finished deliverable, and on the
+	# pass-through path it is the only copy left, so a termination signal must
+	# not delete it.
+	ffmpeg -nostdin -hide_banner -v error -xerror \
+		-threads "$CPUcores" \
+		-nostats -progress "$progressfile" \
+		-i "$file" \
+		-map 0:a \
+		-f null - >/dev/null 2>"$tmplog" &
+	CURRENT_FFMPEG_PID=$!
+	wait "$CURRENT_FFMPEG_PID"
+	local result=$?
+	CURRENT_FFMPEG_PID=""
+
+	if [ "$result" -ne 0 ] || [ -s "$tmplog" ]; then
+		VERIFY_ERROR="could not decode '$file': $(tail -5 "$tmplog")"
+		rm -rf "$tmpdir"
+		CURRENT_TMPDIR=""
+		return 1
+	fi
+
+	local decoded_ms
+	decoded_ms=$(last_progress_ms "$progressfile")
+
+	rm -rf "$tmpdir"
+	CURRENT_TMPDIR=""
+
+	if [ -z "$decoded_ms" ]; then
+		VERIFY_ERROR="could not determine how much of '$file' decoded"
+		return 1
+	fi
+
+	if ! duration_is_plausible "$declared_ms" "$decoded_ms"; then
+		VERIFY_ERROR="'$file' is incomplete, decoded ${decoded_ms}ms of the ${declared_ms}ms it declares"
+		return 1
+	fi
+
+	log "  Verified $(format_duration "$decoded_ms") of audio"
+	return 0
 }
 
 # Losslessly remux an m4b in place to normalize its chunk layout.
@@ -195,11 +315,7 @@ merge_to_m4b() {
 
 	while IFS= read -r -d $'\0' f; do
 		local dur_ms
-		dur_ms=$(ffprobe -v quiet \
-			-show_entries format=duration \
-			-of default=noprint_wrappers=1:nokey=1 \
-			-i "$f" 2>/dev/null |
-			awk '{printf "%d", int($1 * 1000 + 0.5)}')
+		dur_ms=$(probe_duration_ms "$f")
 
 		if [ -z "$dur_ms" ] || ! [ "$dur_ms" -gt 0 ] 2>/dev/null; then
 			log "  Warning: could not get duration for $f, skipping"
@@ -284,6 +400,11 @@ while [ "$keep_running" -eq 1 ]; do
 			full_source_path="$mp3mergedir$dir_item"
 			destdir="$untaggeddir$dir_item/"
 
+			# What gets moved to /failed if this item fails. The pass-through
+			# path points it at /output instead, because by the time that path
+			# can fail the source is no longer in /input to quarantine.
+			quarantine_source="$full_source_path"
+
 			if [ "$dir_item_is_mediafile" -eq 0 ]; then
 				filename_excl_ext=${dir_item::-4}
 				destdir="$untaggeddir$filename_excl_ext/"
@@ -299,6 +420,12 @@ while [ "$keep_running" -eq 1 ]; do
 					if [ "$cmdresult" -eq 0 ]; then
 						log "  Normalizing chapter layout of '$destdir$dir_item'"
 						remux_m4b "$destdir$dir_item"
+
+						if ! verify_m4b "$destdir$dir_item"; then
+							cmdresult=1
+							logerror="Verification failed: $VERIFY_ERROR"
+							quarantine_source="${destdir%/}"
+						fi
 					fi
 				else
 					# Separate non m4b file in root, convert to m4b
@@ -333,8 +460,16 @@ while [ "$keep_running" -eq 1 ]; do
 						CURRENT_FFMPEG_PID=""
 						CURRENT_PARTIAL_OUTPUT=""
 
-						if [ "$cmdresult" -ne 0 ]; then
+						if [ "$cmdresult" -eq 0 ]; then
+							if ! verify_m4b "$destdir$m4bfilename"; then
+								cmdresult=1
+								logerror="Verification failed: $VERIFY_ERROR"
+							fi
+						else
 							logerror=$(cat "$tmplog")
+						fi
+
+						if [ "$cmdresult" -ne 0 ]; then
 							rm -f "$destdir$m4bfilename"
 							rmdir "$destdir" 2>/dev/null
 						else
@@ -360,6 +495,13 @@ while [ "$keep_running" -eq 1 ]; do
 						for copied_m4b in "$destdir"*.m4b; do
 							log "  Normalizing chapter layout of '$copied_m4b'"
 							remux_m4b "$copied_m4b"
+
+							if ! verify_m4b "$copied_m4b"; then
+								cmdresult=1
+								logerror="Verification failed: $VERIFY_ERROR"
+								rm -rf "$destdir"
+								break
+							fi
 						done
 					fi
 				else
@@ -390,11 +532,20 @@ while [ "$keep_running" -eq 1 ]; do
 
 						if merge_to_m4b "$full_source_path" "$destdir$m4bfilename" "$bitrate"; then
 							cmdresult=0
-							log "  Setting permissions"
-							chmod -R a=,a+rwX "$destdir"
+
+							if ! verify_m4b "$destdir$m4bfilename"; then
+								cmdresult=1
+								logerror="Verification failed: $VERIFY_ERROR"
+							fi
 						else
 							cmdresult=1
 							logerror="$MERGE_ERROR"
+						fi
+
+						if [ "$cmdresult" -eq 0 ]; then
+							log "  Setting permissions"
+							chmod -R a=,a+rwX "$destdir"
+						else
 							rm -f "$destdir$m4bfilename"
 							rmdir "$destdir" 2>/dev/null
 						fi
@@ -418,7 +569,7 @@ while [ "$keep_running" -eq 1 ]; do
 				echo "$(date -I'seconds') SUCCESS $action $dir_item" >>"$logfile"
 			else
 				log "  ERROR: Processing failed: $logerror"
-				cp -r "$full_source_path" "$faileddir" && rm -rf "$full_source_path"
+				cp -r "$quarantine_source" "$faileddir" && rm -rf "$quarantine_source"
 				log_error=$(printf '%s' "$logerror" | tail -5 | tr '\n' '|')
 				echo "$(date -I'seconds') FAILED $action $dir_item: $log_error" >>"$logfile"
 			fi

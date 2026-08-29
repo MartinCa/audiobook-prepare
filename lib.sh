@@ -30,6 +30,79 @@ duration_to_seconds() {
 	esac
 }
 
+# Render whole milliseconds as HH:MM:SS.
+# Outputs nothing and returns 1 if the value is not a whole number.
+format_duration() {
+	local ms="$1"
+	local total
+
+	case "$ms" in
+	'' | *[!0-9]*) return 1 ;;
+	esac
+
+	total=$((ms / 1000))
+	printf '%02d:%02d:%02d\n' \
+		$((total / 3600)) $((total % 3600 / 60)) $((total % 60))
+}
+
+# Returns 0 when two durations in milliseconds are close enough to be the same
+# audio. Encoder priming/padding and container rounding shift a duration by a
+# fraction of a second, so allow 0.5% with a 2 second floor; that still rejects
+# a merge that lost a whole source file. Returns 1 on non-numeric input.
+duration_is_plausible() {
+	local expected="$1"
+	local actual="$2"
+	local difference tolerance
+
+	case "$expected" in
+	'' | *[!0-9]*) return 1 ;;
+	esac
+	case "$actual" in
+	'' | *[!0-9]*) return 1 ;;
+	esac
+
+	if [ "$actual" -ge "$expected" ]; then
+		difference=$((actual - expected))
+	else
+		difference=$((expected - actual))
+	fi
+
+	tolerance=$((expected / 200))
+	if [ "$tolerance" -lt 2000 ]; then
+		tolerance=2000
+	fi
+
+	[ "$difference" -le "$tolerance" ]
+}
+
+# Whole milliseconds of output reported by the last progress block ffmpeg
+# wrote to $1 (see `ffmpeg -progress`). Outputs nothing and returns 1 if the
+# file holds no usable value.
+last_progress_ms() {
+	local file="$1"
+	local microseconds
+
+	if [ ! -r "$file" ]; then
+		return 1
+	fi
+
+	# ffmpeg reports microseconds in out_time_us and, despite its name, in
+	# out_time_ms too. Prefer the honestly named field and fall back for
+	# builds that only emit the other. Blocks written before any output has
+	# been produced carry N/A, so only whole numbers are considered.
+	microseconds=$(grep -E '^out_time_us=[0-9]+$' "$file" | tail -n 1 | cut -d= -f2)
+
+	if [ -z "$microseconds" ]; then
+		microseconds=$(grep -E '^out_time_ms=[0-9]+$' "$file" | tail -n 1 | cut -d= -f2)
+	fi
+
+	if [ -z "$microseconds" ]; then
+		return 1
+	fi
+
+	echo $((microseconds / 1000))
+}
+
 is_media_file() {
 	if [ ! -f "$1" ]; then
 		return 1

@@ -80,6 +80,114 @@ teardown() {
 	[ "$status" -eq 1 ]
 }
 
+# --- format_duration --------------------------------------------------------
+
+@test "format_duration: renders hours, minutes and seconds" {
+	run format_duration 37425000
+	[ "$status" -eq 0 ]
+	[ "$output" = "10:23:45" ]
+}
+
+@test "format_duration: pads single digits" {
+	run format_duration 5000
+	[ "$status" -eq 0 ]
+	[ "$output" = "00:00:05" ]
+}
+
+@test "format_duration: truncates sub-second remainders" {
+	run format_duration 1999
+	[ "$status" -eq 0 ]
+	[ "$output" = "00:00:01" ]
+}
+
+@test "format_duration: rejects non-numeric input" {
+	run format_duration "N/A"
+	[ "$status" -eq 1 ]
+}
+
+# --- duration_is_plausible --------------------------------------------------
+
+@test "duration_is_plausible: identical durations match" {
+	run duration_is_plausible 36000000 36000000
+	[ "$status" -eq 0 ]
+}
+
+@test "duration_is_plausible: encoder padding on a short file is within the floor" {
+	run duration_is_plausible 30000 31500
+	[ "$status" -eq 0 ]
+}
+
+@test "duration_is_plausible: drift of exactly 0.5% on a long book is accepted" {
+	# 10 hours, 3 minutes of drift
+	run duration_is_plausible 36000000 35820000
+	[ "$status" -eq 0 ]
+}
+
+@test "duration_is_plausible: a dropped 8 minute file on a 10 hour book is rejected" {
+	run duration_is_plausible 36000000 35520000
+	[ "$status" -eq 1 ]
+}
+
+@test "duration_is_plausible: rejects a file that is too long as well as too short" {
+	run duration_is_plausible 36000000 36480000
+	[ "$status" -eq 1 ]
+}
+
+@test "duration_is_plausible: rejects non-numeric expected" {
+	run duration_is_plausible "N/A" 36000000
+	[ "$status" -eq 1 ]
+}
+
+@test "duration_is_plausible: rejects empty actual" {
+	run duration_is_plausible 36000000 ""
+	[ "$status" -eq 1 ]
+}
+
+# --- last_progress_ms -------------------------------------------------------
+
+@test "last_progress_ms: reads out_time_us from a progress block" {
+	printf 'bitrate=64.0kbits/s\nout_time_us=37425000000\nout_time_ms=37425000000\nprogress=end\n' \
+		>"$workdir/progress"
+	run last_progress_ms "$workdir/progress"
+	[ "$status" -eq 0 ]
+	[ "$output" = "37425000" ]
+}
+
+@test "last_progress_ms: takes the last block when several are appended" {
+	printf 'out_time_us=1000000\nprogress=continue\nout_time_us=9000000\nprogress=end\n' \
+		>"$workdir/progress"
+	run last_progress_ms "$workdir/progress"
+	[ "$status" -eq 0 ]
+	[ "$output" = "9000" ]
+}
+
+@test "last_progress_ms: ignores N/A blocks written before output starts" {
+	printf 'out_time_us=N/A\nprogress=continue\nout_time_us=4000000\nprogress=end\n' \
+		>"$workdir/progress"
+	run last_progress_ms "$workdir/progress"
+	[ "$status" -eq 0 ]
+	[ "$output" = "4000" ]
+}
+
+@test "last_progress_ms: falls back to out_time_ms, which is also microseconds" {
+	printf 'out_time_ms=4000000\nprogress=end\n' >"$workdir/progress"
+	run last_progress_ms "$workdir/progress"
+	[ "$status" -eq 0 ]
+	[ "$output" = "4000" ]
+}
+
+@test "last_progress_ms: fails on a progress file with no usable value" {
+	printf 'progress=end\n' >"$workdir/progress"
+	run last_progress_ms "$workdir/progress"
+	[ "$status" -eq 1 ]
+	[ -z "$output" ]
+}
+
+@test "last_progress_ms: fails when the progress file is missing" {
+	run last_progress_ms "$workdir/does-not-exist"
+	[ "$status" -eq 1 ]
+}
+
 # --- is_media_file ----------------------------------------------------------
 
 @test "is_media_file: recognizes known extensions" {
