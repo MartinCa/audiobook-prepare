@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Usage: hashupdate <FILE> <NAME> <VERSION>
 # Updates the NAME_SHA256 ARG in FILE for the given VERSION.
 set -euo pipefail

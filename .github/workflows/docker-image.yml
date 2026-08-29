@@ -10,6 +10,18 @@ on:
 permissions: {}
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run Shellcheck
+        run: shellcheck lib.sh process_mp3merge.sh runscript.sh hashupdate
+
   test:
     runs-on: ubuntu-latest
     permissions:

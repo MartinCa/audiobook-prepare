@@ -126,6 +126,7 @@ is_stable() {
 	local item="$1"
 	local now newest age mtimes scanresult
 
+	# shellcheck disable=SC2154
 	if [ "$stabletime" -le 0 ]; then
 		return 0
 	fi
