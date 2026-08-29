@@ -283,7 +283,7 @@ remux_m4b() {
 	CURRENT_PARTIAL_OUTPUT=""
 
 	if [ $result -ne 0 ] || [ ! -s "$tmpfile" ]; then
-		log "  Warning: could not normalize chapter layout of '$file', keeping original: $(cat "$tmplog" | tail -3)"
+		log "  Warning: could not normalize chapter layout of '$file', keeping original: $(tail -3 "$tmplog")"
 		rm -f "$tmpfile" "$tmplog"
 		return 1
 	fi
