@@ -37,8 +37,9 @@ podman compose build --no-cache
   - Single M4B files: direct move to output
   - Single non-M4B files: convert with bitrate preservation (via `get_audio_bitrate` + FFmpeg)
   - Directories with multiple files: merge into single M4B with chapter markers derived from filenames (via `merge_to_m4b` using FFmpeg concat demuxer + ffmetadata)
+  - Verifies every finished M4B before publishing it (via `verify_m4b`), whatever path produced it: checks for an audio stream, decodes every sample with `ffmpeg -f null -` treating any `-v error` output as failure, and compares the decoded length against the container's declared duration to catch truncation
   - Extracts companion ebooks (.mobi, .pdf, .epub, .azw, .azw3) to separate directory
-  - Failed conversions isolated to `/failed` directory
+  - Failed conversions isolated to `/failed` directory. On the pass-through path the source is already gone from `/input` by the time verification runs, so `quarantine_source` points at the copy in `/output` instead
 
 ### Volume Mounts
 
@@ -59,6 +60,7 @@ podman compose build --no-cache
 | MONITOR_DIR | 1 | 1=continuous monitoring, 0=single run |
 | SLEEPTIME | 5m | Interval between processing runs (when MONITOR_DIR=1) |
 | STABLE_TIME | 2m | Time a file/folder must be unchanged before it's processed; guards against partial copies. 0 disables |
+| VERIFY_OUTPUT | 1 | Decode each finished M4B to check it before publishing; failures go to `/failed`. 0 disables |
 
 ## Key Tools Used
 
