@@ -12,7 +12,7 @@ logfile="/config/processing.log"
 m4bext=".m4b"
 ebook_find_args=( -name "*.mobi" -o -name "*.pdf" -o -name "*.epub" -o -name "*.azw" -o -name "*.azw3" -o -name "*.kfx" -o -name "*.fb2" -o -name "*.djvu" )
 
-cd "$mp3mergedir"
+cd "$mp3mergedir" || exit 1
 
 touch -a "$logfile"
 mkdir -p "$mp3mergedir"
@@ -283,7 +283,7 @@ remux_m4b() {
 	CURRENT_PARTIAL_OUTPUT=""
 
 	if [ $result -ne 0 ] || [ ! -s "$tmpfile" ]; then
-		log "  Warning: could not normalize chapter layout of '$file', keeping original: $(cat "$tmplog" | tail -3)"
+		log "  Warning: could not normalize chapter layout of '$file', keeping original: $(tail -3 "$tmplog")"
 		rm -f "$tmpfile" "$tmplog"
 		return 1
 	fi
@@ -380,9 +380,9 @@ merge_to_m4b() {
 }
 
 while [ "$keep_running" -eq 1 ]; do
-	dir_content=*
+	dir_content=(*)
 
-	for dir_item in $dir_content; do
+	for dir_item in "${dir_content[@]}"; do
 		is_media_file "$dir_item"
 		dir_item_is_mediafile=$?
 
@@ -583,6 +583,6 @@ while [ "$keep_running" -eq 1 ]; do
 		keep_running=0
 	else
 		log "Done for now, sleeping for $sleeptime"
-		sleep $sleeptime
+		sleep "$sleeptime"
 	fi
 done
