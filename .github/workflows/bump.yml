@@ -37,3 +37,4 @@ jobs:
         uses: wader/bump/action@66ffa6309041402cc61a40537b1ff8abe9909871 # master
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+

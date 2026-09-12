@@ -1,16 +1,22 @@
-name: Docker Image CI
+name: CI
 
 on:
   push:
     branches: ["main"]
   pull_request:
-    branches: ["main"]
-  workflow_dispatch:
 
 permissions: {}
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.12.3"
+
 jobs:
   lint:
+    name: Lint
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -23,6 +29,7 @@ jobs:
         run: shellcheck lib.sh process_mp3merge.sh runscript.sh hashupdate
 
   test:
+    name: Tests
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -40,9 +47,11 @@ jobs:
         run: bats tests/
 
   build:
+    name: Docker build
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: write # gha cache (build-push-action cache-to/cache-from type=gha)
 
     steps:
       - name: Check out the repo
@@ -86,3 +95,30 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: ${{ steps.cache.outputs.cache-from }}
           cache-to: ${{ steps.cache.outputs.cache-to }}
+
+  zizmor:
+    name: Zizmor
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # upload zizmor's SARIF report to code scanning
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: Audit workflows
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: uvx zizmor@1.29.0 --format sarif . > zizmor.sarif
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          sarif_file: zizmor.sarif
+          category: zizmor
