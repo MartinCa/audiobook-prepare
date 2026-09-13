@@ -10,7 +10,7 @@ faileddir="/failed/"
 ebookfilesdir="/ebookfiles/"
 logfile="/config/processing.log"
 m4bext=".m4b"
-ebook_find_args=( -name "*.mobi" -o -name "*.pdf" -o -name "*.epub" -o -name "*.azw" -o -name "*.azw3" -o -name "*.kfx" -o -name "*.fb2" -o -name "*.djvu" )
+ebook_find_args=(-name "*.mobi" -o -name "*.pdf" -o -name "*.epub" -o -name "*.azw" -o -name "*.azw3" -o -name "*.kfx" -o -name "*.fb2" -o -name "*.djvu")
 
 cd "$mp3mergedir" || exit 1
 
