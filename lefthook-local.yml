@@ -1,0 +1,23 @@
+# lefthook-local.yml
+#
+# Repo-wide lefthook overrides for this checkout (committed, not personal).
+#
+# lefthook-configs v2.1.0 ships pre-push fragments for Go, Python, and TS only
+# (`pre-push-go.yml` / `pre-push-python.yml` / `pre-push-ts.yml`) — there is no
+# pre-push-shell fragment yet. This shell repo keeps its bats suite behind a
+# pre-push gate anyway, so the group lives here until a shared
+# `pre-push-shell.yml` fragment lands upstream in MartinCa/lefthook-configs
+# (if more shell repos want it, that's the natural home).
+
+# A pre-push command has no glob/file template on purpose: lefthook only knows
+# the pushed file list (`{push_files}`), and a test suite is repo-wide anyway —
+# `test-shell` runs on EVERY push. Keep the suite fast; it gates every push.
+#
+# Escape hatches for real emergencies:
+#   - git push --no-verify   # bypass ALL hooks for this push
+#   - LEFTHOOK=0 git push    # bypass lefthook only (re-register on install)
+pre-push:
+  parallel: true
+  commands:
+    test-shell:
+      run: bats tests/

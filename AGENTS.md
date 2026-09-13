@@ -31,17 +31,24 @@ gunzip /tmp/lefthook.gz && chmod +x /tmp/lefthook && mv /tmp/lefthook ~/.local/b
 PATH="$HOME/.local/bin:$PATH" lefthook install   # idempotent; re-run after a fresh clone
 ```
 
-`lefthook.yml` pins the shared `MartinCa/lefthook-configs` fragments at `v2.0.1`:
+`lefthook.yml` pins the shared `MartinCa/lefthook-configs` fragments at `v2.1.0`:
 - **pre-commit** — `langs/shell.yml` runs `shfmt -w` and a *blocking* `shellcheck`
   on staged `*.sh`/`*.bash` (re-staging fixed files); `lefthook-shared.yml`
   secret-scans the staged diff with `betterleaks` (blocks the commit on a leak)
   and audits staged `.github/workflows/*` files with `zizmor` (blocks on a
   finding).
+- **pre-push** — the local `test-shell` group runs the full bats suite
+  (`bats tests/`) on every push, blocking pushes on a red suite.
 - **commit-msg** — `commit-msg.yml` enforces Conventional Commits, e.g.
   `feat: ...`, `fix(api): ...`.
 
-`lefthook-local.yml` is a repo-wide override layer (not a personal one). It is
-currently empty (no overrides).
+`lefthook-local.yml` is a repo-wide override layer (not a personal one). It
+holds the **pre-push** gate (`bats tests/`) above: lefthook-configs v2.1.0
+ships `pre-push-{go,python,ts}.yml` fragments but no shell one, so this shell
+repo defines its own group locally. If more shell repos want the same gate,
+promote it to a shared `pre-push-shell.yml` fragment in
+`MartinCa/lefthook-configs` — the natural upstream home — instead of vendoring
+per-repo.
 
 Coverage vs. CI (`ci.yml`): shellcheck is enforced in **both** the hook and the
 `lint` job (`shellcheck lib.sh process_mp3merge.sh runscript.sh hashupdate`);
@@ -55,7 +62,9 @@ in both places but in CI it only uploads a SARIF report to code scanning
 still exercised via `bats tests/`.
 
 Two hook tools must be on `PATH`: `betterleaks` (secret scan, install per its
-project README) and `zizmor` (workflow audit, install from zizmor.sh). If a tool
-is missing, `LEFTHOOK=0 git commit` skips the hooks entirely — a pragmatic escape
-hatch for restricted setups, not a way to dodge the gates. `lefthook dump` shows
-the merged hook config; `lefthook run pre-commit --all-files` verifies it.
+project README) and `zizmor` (workflow audit, install from zizmor.sh); the
+pre-push suite additionally needs `bats` (bats-core, install per its README).
+If a tool is missing, `LEFTHOOK=0 git push/commit` skips the hooks entirely — a
+pragmatic escape hatch for restricted setups, not a way to dodge the gates.
+`lefthook dump` shows the merged hook config; `lefthook run pre-commit
+--all-files` verifies it.
