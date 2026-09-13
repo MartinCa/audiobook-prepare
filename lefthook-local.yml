@@ -1,27 +1,17 @@
 # lefthook-local.yml — repo-wide override layer (see AGENTS.md "Git hooks").
 #
-# Two local adaptations of the shared v2.0.0 fragments:
+# One local adaptation of the shared v2.0.1 fragments:
 #
-# 1. lint-shell (`langs/shell.yml`) — the fragment runs plain `shellcheck`
-#    over {staged_files}. A commit that stages process_mp3merge.sh (or any
-#    script sourcing lib.sh) WITHOUT lib.sh makes shellcheck emit info-level
-#    SC1091 ("not following: ./lib.sh") and exit 1, blocking an otherwise fine
-#    commit. `-x` makes shellcheck follow sourced files (scoped to the repo
-#    path), so single-file commits pass and lib.sh itself gets linted as part
-#    of every such check.
-#
-# 2. zizmor (`lefthook-shared.yml`) — the fragment blocks any commit that
-#    stages a workflow file zizmor flags. .github/workflows/bump.yml carries a
-#    PRE-EXISTING HIGH finding (actions/create-github-app-token without
-#    `permission-*` inputs) that predates this migration. Fixing it means
-#    scoping the GitHub App token, which needs the app's real permission
-#    requirements — out of scope here. It stays visible in CI: ci.yml's zizmor
-#    job still scans the whole repo and uploads a SARIF report to code scanning
-#    (non-blocking). TODO: remove this exclusion and give the action
-#    `permissions:` inputs (https://docs.zizmor.sh/audits/#github-app).
+# zizmor (`lefthook-shared.yml`) — the fragment blocks any commit that stages
+# a workflow file zizmor flags. .github/workflows/bump.yml carries a
+# PRE-EXISTING HIGH finding (actions/create-github-app-token without
+# `permission-*` inputs) that predates this migration. Fixing it means
+# scoping the GitHub App token, which needs the app's real permission
+# requirements — out of scope here. It stays visible in CI: ci.yml's zizmor
+# job still scans the whole repo and uploads a SARIF report to code scanning
+# (non-blocking). TODO: remove this exclusion and give the action
+# `permissions:` inputs (https://docs.zizmor.sh/audits/#github-app).
 pre-commit:
   commands:
-    lint-shell:
-      run: shellcheck -x {staged_files}
     zizmor:
       exclude: [".github/workflows/bump.yml"]

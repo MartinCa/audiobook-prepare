@@ -15,8 +15,13 @@ locally in this container — verify via the CI checks on the PR.
 ## Git hooks
 
 Local hooks run through [lefthook](https://github.com/evilmartians/lefthook), a
-single static binary (this repo has no package-manager hook install). Install
-it, then register the hooks:
+single static binary (this repo has no package-manager hook install).
+
+**AI agents**: do not install the lefthook binary yourself — it is included in
+the OpenCode image. If `lefthook` is not on PATH, report this to the user and
+ask whether to install it.
+
+For human contributors: install lefthook, then register the hooks:
 
 ```sh
 curl -fsSL -o /tmp/lefthook.gz \
@@ -26,7 +31,7 @@ gunzip /tmp/lefthook.gz && chmod +x /tmp/lefthook && mv /tmp/lefthook ~/.local/b
 PATH="$HOME/.local/bin:$PATH" lefthook install   # idempotent; re-run after a fresh clone
 ```
 
-`lefthook.yml` pins the shared `MartinCa/lefthook-configs` fragments at `v2.0.0`:
+`lefthook.yml` pins the shared `MartinCa/lefthook-configs` fragments at `v2.0.1`:
 - **pre-commit** — `langs/shell.yml` runs `shfmt -w` and a *blocking* `shellcheck`
   on staged `*.sh`/`*.bash` (re-staging fixed files); `lefthook-shared.yml`
   secret-scans the staged diff with `betterleaks` (blocks the commit on a leak)
