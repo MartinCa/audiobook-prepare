@@ -48,6 +48,9 @@ the hook covers `*.sh`/`*.bash` while CI additionally names the extensionless
 and the commit-msg check are **hook-only** — CI does not run them. `zizmor` runs
 in both places but in CI it only uploads a SARIF report to code scanning
 (non-blocking, not a merge gate); the pre-commit hook is the blocking check.
+`tests/lib.bats` is outside both the hook's `*.sh`/`*.bash` glob and CI's explicit
+`shellcheck` list, so it is not linted — a known (informational) parity gap; it is
+still exercised via `bats tests/`.
 
 Two hook tools must be on `PATH`: `betterleaks` (secret scan, install per its
 project README) and `zizmor` (workflow audit, install from zizmor.sh). If a tool
