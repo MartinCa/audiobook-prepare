@@ -40,11 +40,8 @@ PATH="$HOME/.local/bin:$PATH" lefthook install   # idempotent; re-run after a fr
 - **commit-msg** — `commit-msg.yml` enforces Conventional Commits, e.g.
   `feat: ...`, `fix(api): ...`.
 
-`lefthook-local.yml` is a repo-wide override layer (not a personal one): it
-excludes `.github/workflows/bump.yml` from the `zizmor` hook scan because that
-workflow has a pre-existing HIGH zizmor finding (GitHub App token used without
-scoped `permission-*` inputs). It remains visible in CI's non-blocking zizmor
-SARIF upload, and its comment carries the TODO to fix and remove the exclusion.
+`lefthook-local.yml` is a repo-wide override layer (not a personal one). It is
+currently empty (no overrides).
 
 Coverage vs. CI (`ci.yml`): shellcheck is enforced in **both** the hook and the
 `lint` job (`shellcheck lib.sh process_mp3merge.sh runscript.sh hashupdate`);
