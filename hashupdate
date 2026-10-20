@@ -7,6 +7,7 @@ URL_TEMPLATE=$(grep "$2_URL=" "$1" | sed -E 's/.*="(.*)"/\1/')
 URL=$(echo "$URL_TEMPLATE" | sed "s/\$$2_VERSION/$3/g")
 TMP=$(mktemp)
 trap 'rm -f "$TMP"' EXIT
-curl -fsSL "$URL" -o "$TMP"
-SHA256=$(sha256sum "$TMP" | sed -e 's/  .*//')
+curl -fSL --retry 3 --retry-delay 2 -s "$URL" -o "$TMP"
+SHA256=$(sha256sum "$TMP")
+SHA256=${SHA256%% *}
 sed -i -E "s/$2_SHA256=.*/$2_SHA256=$SHA256/" "$1"
