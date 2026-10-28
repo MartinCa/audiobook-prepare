@@ -1,6 +1,6 @@
 services:
   audiobook-prepare:
-    image: martinc01/audiobook-prepare@sha256:fec7986a84ff0a1570f6327aa355e135c9156e36a73e2a46533ee3cd07124bae
+    image: ghcr.io/martinca/audiobook-prepare@sha256:5cb98307d0b32519ae498f0fdbf66cbdfab9c8cf1388a90b4de8d65be8dac823
     container_name: audiobook-prepare
     restart: unless-stopped
     volumes:
